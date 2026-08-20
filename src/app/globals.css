@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+:root {
+  --bg-main: #0a0e17;
+  --bg-card: #111827;
+  --bg-card-hover: #1f293d;
+  --border-card: #1e293b;
+  --accent-badminton: #84cc16; /* Lime */
+  --accent-padel: #06b6d4;     /* Cyan */
+  --accent-live: #ef4444;      /* Red */
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Sports Scoreboard Font Stylings */
+.font-score {
+  font-family: "Courier New", Courier, monospace, system-ui;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+/* Smooth Horizontal Scroll for Mobile Bracket */
+.bracket-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0f172a;
+}
+
+.bracket-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.bracket-scroll::-webkit-scrollbar-track {
+  background: #0f172a;
+  border-radius: 4px;
+}
+
+.bracket-scroll::-webkit-scrollbar-thumb {
+  background-color: #334155;
+  border-radius: 4px;
+}
+
+/* Pulse animation for live badge */
+@keyframes live-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.15);
+  }
+}
+
+.animate-live-dot {
+  animation: live-pulse 1.6s infinite ease-in-out;
+}
