@@ -111,9 +111,13 @@ export const TournamentService = {
 
   resetDefaults(): Tournament[] {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_TOURNAMENTS));
-      window.dispatchEvent(new Event(EVENT_KEY));
-      if (syncChannel) syncChannel.postMessage({ type: 'UPDATE' });
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_TOURNAMENTS));
+        window.dispatchEvent(new Event(EVENT_KEY));
+        if (syncChannel) syncChannel.postMessage({ type: 'UPDATE' });
+      } catch (e) {
+        // localStorage may be full or disabled - silent fallback
+      }
     }
     return INITIAL_TOURNAMENTS;
   },
@@ -262,14 +266,15 @@ export function useTournaments() {
     window.addEventListener('storage', handleUpdate);
 
     if (syncChannel) {
-      syncChannel.onmessage = () => {
-        setTournaments(TournamentService.getAll());
-      };
+      syncChannel.addEventListener('message', handleUpdate);
     }
 
     return () => {
       window.removeEventListener(EVENT_KEY, handleUpdate);
       window.removeEventListener('storage', handleUpdate);
+      if (syncChannel) {
+        syncChannel.removeEventListener('message', handleUpdate);
+      }
     };
   }, []);
 
@@ -294,14 +299,15 @@ export function useTournament(id: string) {
     window.addEventListener('storage', handleUpdate);
 
     if (syncChannel) {
-      syncChannel.onmessage = () => {
-        setTournament(TournamentService.getById(id));
-      };
+      syncChannel.addEventListener('message', handleUpdate);
     }
 
     return () => {
       window.removeEventListener(EVENT_KEY, handleUpdate);
       window.removeEventListener('storage', handleUpdate);
+      if (syncChannel) {
+        syncChannel.removeEventListener('message', handleUpdate);
+      }
     };
   }, [id]);
 

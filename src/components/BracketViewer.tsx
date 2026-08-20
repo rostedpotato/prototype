@@ -1,8 +1,8 @@
 'use client';
 
-import { Tournament, Match, SportType } from '@/types/tournament';
+import { Tournament, Match } from '@/types/tournament';
 import { useAdminAuth } from '@/lib/authStore';
-import { Trophy, SlidersHorizontal, CheckCircle2, ChevronRight, Medal } from 'lucide-react';
+import { Trophy, SlidersHorizontal, Medal } from 'lucide-react';
 
 interface BracketViewerProps {
   tournament: Tournament;
@@ -183,7 +183,7 @@ export default function BracketViewer({ tournament, onOpenScoreControl }: Bracke
                                           className={`w-5 h-5 rounded flex items-center justify-center border ${
                                             s.score1 > s.score2
                                               ? 'bg-slate-800 border-slate-600 text-white font-black'
-                                              : 'bg-slate-950 border-slate-850 text-slate-400'
+                                              : 'bg-slate-950 border-slate-800 text-slate-400'
                                           }`}
                                         >
                                           {s.score1}
@@ -233,7 +233,7 @@ export default function BracketViewer({ tournament, onOpenScoreControl }: Bracke
                                           className={`w-5 h-5 rounded flex items-center justify-center border ${
                                             s.score2 > s.score1
                                               ? 'bg-slate-800 border-slate-600 text-white font-black'
-                                              : 'bg-slate-950 border-slate-850 text-slate-400'
+                                              : 'bg-slate-950 border-slate-800 text-slate-400'
                                           }`}
                                         >
                                           {s.score2}

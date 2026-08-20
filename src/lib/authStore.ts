@@ -8,13 +8,21 @@ export const DEFAULT_ADMIN_PIN = 'admin123';
 export const AuthService = {
   isAdmin(): boolean {
     if (typeof window === 'undefined') return false;
-    return localStorage.getItem(ADMIN_AUTH_KEY) === 'true';
+    try {
+      return localStorage.getItem(ADMIN_AUTH_KEY) === 'true';
+    } catch {
+      return false;
+    }
   },
 
   login(pin: string): boolean {
     if (pin === DEFAULT_ADMIN_PIN || pin === 'admin') {
-      localStorage.setItem(ADMIN_AUTH_KEY, 'true');
-      window.dispatchEvent(new Event('auth_changed'));
+      try {
+        localStorage.setItem(ADMIN_AUTH_KEY, 'true');
+        window.dispatchEvent(new Event('auth_changed'));
+      } catch {
+        // localStorage unavailable — session will not persist across tabs
+      }
       return true;
     }
     return false;
@@ -22,8 +30,12 @@ export const AuthService = {
 
   logout(): void {
     if (typeof window === 'undefined') return;
-    localStorage.removeItem(ADMIN_AUTH_KEY);
-    window.dispatchEvent(new Event('auth_changed'));
+    try {
+      localStorage.removeItem(ADMIN_AUTH_KEY);
+      window.dispatchEvent(new Event('auth_changed'));
+    } catch {
+      // localStorage unavailable
+    }
   },
 };
 

@@ -2,7 +2,7 @@
 
 import { Match, SportType } from '@/types/tournament';
 import { useAdminAuth } from '@/lib/authStore';
-import { Trophy, Radio, Clock, CheckCircle2, SlidersHorizontal } from 'lucide-react';
+import { Clock, CheckCircle2, SlidersHorizontal } from 'lucide-react';
 
 interface LiveScoreCardProps {
   match: Match;
@@ -59,7 +59,7 @@ export default function LiveScoreCard({
       }`}
     >
       {/* Top Meta Bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-950/60 border-b border-slate-850 text-xs">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-950/60 border-b border-slate-800 text-xs">
         <div className="flex items-center gap-2">
           {/* Sport Indicator */}
           <span
@@ -123,7 +123,7 @@ export default function LiveScoreCard({
                   {match.participant1?.name || 'TBD (Menunggu Lawan)'}
                 </span>
                 {match.participant1?.seed && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-800 text-amber-400 border border-amber-400/30">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 border border-amber-400/30">
                     [{match.participant1.seed}]
                   </span>
                 )}
@@ -184,7 +184,7 @@ export default function LiveScoreCard({
                   {match.participant2?.name || 'TBD (Menunggu Lawan)'}
                 </span>
                 {match.participant2?.seed && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-800 text-amber-400 border border-amber-400/30">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 border border-amber-400/30">
                     [{match.participant2.seed}]
                   </span>
                 )}

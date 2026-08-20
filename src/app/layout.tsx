@@ -1,22 +1,17 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import Navbar from '@/components/Navbar';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 
 export const metadata: Metadata = {
   title: 'Racket Arena | Badminton & Padel Tournament Live Center',
   description:
     'Sistem manajemen dan live score turnamen Bulutangkis (Badminton) dan Padel dengan bagan sistem gugur interaktif dan live scoring wasit.',
+  metadataBase: new URL('https://racket-arena.vercel.app'),
+  openGraph: {
+    title: 'Racket Arena | Badminton & Padel Tournament',
+    description: 'Live score turnamen Badminton & Padel — bagan, jadwal, dan skor langsung.',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({
@@ -28,7 +23,7 @@ export default function RootLayout({
     <html
       lang="id"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <body suppressHydrationWarning className="min-h-full flex flex-col bg-[#0a0e17] text-slate-100 font-sans selection:bg-lime-500 selection:text-slate-950">
         <Navbar />

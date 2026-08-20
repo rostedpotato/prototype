@@ -18,8 +18,6 @@ import {
   Plus,
   Trash2,
   Sparkles,
-  Calendar,
-  MapPin,
   CheckCircle2,
 } from 'lucide-react';
 

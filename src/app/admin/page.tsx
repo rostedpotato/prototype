@@ -9,7 +9,6 @@ import {
   Shield,
   Plus,
   Trophy,
-  Activity,
   Calendar,
   MapPin,
   Users,
@@ -21,7 +20,7 @@ import {
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const { isAdmin, isReady, logout } = useAdminAuth();
+  const { isAdmin, isReady } = useAdminAuth();
   const { tournaments, service } = useTournaments();
 
   useEffect(() => {
@@ -144,6 +143,7 @@ export default function AdminDashboardPage() {
                   <Link
                     href={`/tournament/${t.id}`}
                     target="_blank"
+                    rel="noopener noreferrer"
                     className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors flex items-center gap-1.5"
                     title="Lihat Tampilan Publik"
                   >

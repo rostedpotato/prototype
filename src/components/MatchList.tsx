@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Tournament, Match, MatchStatus } from '@/types/tournament';
+import { Tournament, Match } from '@/types/tournament';
 import LiveScoreCard from './LiveScoreCard';
-import { Search, Filter, Calendar } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useDebounce } from '@/lib/useDebounce';
 
 interface MatchListProps {
@@ -27,8 +27,8 @@ export default function MatchList({ tournament, onOpenScoreControl }: MatchListP
     // Search query
     if (debouncedSearchQuery.trim()) {
       const q = debouncedSearchQuery.toLowerCase();
-      const p1Match = m.participant1?.name.toLowerCase().includes(q);
-      const p2Match = m.participant2?.name.toLowerCase().includes(q);
+      const p1Match = m.participant1?.name?.toLowerCase().includes(q);
+      const p2Match = m.participant2?.name?.toLowerCase().includes(q);
       const roundMatch = m.roundName.toLowerCase().includes(q);
       if (!p1Match && !p2Match && !roundMatch) return false;
     }

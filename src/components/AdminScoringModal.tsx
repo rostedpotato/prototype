@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Match, SetScore, MatchStatus, SportType, Participant } from '@/types/tournament';
+import { Match, SetScore, MatchStatus, SportType } from '@/types/tournament';
 import { TournamentService, useTournament } from '@/lib/tournamentStore';
 import {
   checkSetStatus,
@@ -17,8 +17,6 @@ import {
   CircleDot,
   AlertTriangle,
   Users,
-  ChevronRight,
-  Sparkles,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 

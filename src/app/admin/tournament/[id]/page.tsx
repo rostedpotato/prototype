@@ -7,18 +7,15 @@ import { useTournament } from '@/lib/tournamentStore';
 import { useAdminAuth } from '@/lib/authStore';
 import BracketViewer from '@/components/BracketViewer';
 import AdminScoringModal from '@/components/AdminScoringModal';
-import { Match, MatchStatus } from '@/types/tournament';
+import { Match } from '@/types/tournament';
 import {
   ArrowLeft,
-  Shield,
   Trophy,
   ExternalLink,
   SlidersHorizontal,
   Layers,
   Calendar,
-  Clock,
   MapPin,
-  CheckCircle2,
   Lock,
 } from 'lucide-react';
 
@@ -88,6 +85,7 @@ export default function AdminTournamentManagePage() {
         <Link
           href={`/tournament/${tournament.id}`}
           target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors"
         >
           <ExternalLink className="w-4 h-4" />

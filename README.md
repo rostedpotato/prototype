@@ -85,7 +85,29 @@ Platform manajemen dan *live score* turnamen Bulutangkis (Badminton) dan Padel b
 
 Setiap perubahan, perbaikan bug, dan penambahan fitur dicatat secara berkala di bawah ini:
 
-### [v1.3.0] - 2026-08-17 (Terbaru)
+### [v1.4.0] - 2026-08-20 (Terbaru — Production Ready)
+* **🔴 Bug Fix Kritis — Crash pada Pencarian Jadwal**:
+  * Memperbaiki `TypeError` saat mengetik pencarian di halaman jadwal ketika peserta belum terisi (*TBD*). Menambahkan *optional chaining* (`?.name?.toLowerCase()`).
+* **🧹 Pembersihan Unused Imports (11 File)**:
+  * Menghapus 20+ ikon Lucide React dan tipe TypeScript yang di-import tetapi tidak digunakan di seluruh *codebase*. Mengurangi ukuran *bundle* dan waktu evaluasi JavaScript.
+* **⚡ Optimasi Bundle untuk Vercel Free Tier**:
+  * Menambahkan `optimizePackageImports: ['lucide-react']` pada `next.config.ts` untuk *tree-shaking* ikon secara otomatis.
+  * Menambahkan `poweredByHeader: false` untuk keamanan.
+  * Menghapus *font* Google Geist yang di-download tetapi tidak dirender (~50KB *bandwidth* hemat per kunjungan).
+* **🔒 Perbaikan Memory Leak (`BroadcastChannel`)**:
+  * Mengganti `.onmessage` langsung dengan `addEventListener` / `removeEventListener` pada hook `useTournaments` dan `useTournament` agar *listener* dibersihkan saat komponen di-*unmount*.
+* **🛡️ Penanganan Error `localStorage`**:
+  * Menambahkan `try/catch` pada semua operasi `localStorage` di `authStore.ts` dan `tournamentStore.ts` (`resetDefaults`). Mencegah *crash* pada mode *Private Browsing* atau saat *storage* penuh.
+* **🎨 Perbaikan CSS Tailwind**:
+  * Mengganti class non-standar `border-slate-850` → `border-slate-800` dan `py-0.2` → `py-0.5`.
+  * Menghapus 5 CSS custom property yang tidak digunakan dari `globals.css`.
+* **🔗 Keamanan Link Eksternal**:
+  * Menambahkan `rel="noopener noreferrer"` pada semua link `target="_blank"`.
+* **📋 SEO & Social Sharing**:
+  * Menambahkan `metadataBase` dan `openGraph` metadata pada `layout.tsx` agar *preview link* tampil rapi di WhatsApp, Telegram, dll.
+
+
+### [v1.3.0] - 2026-08-17
 * **Optimasi Search Bar (`useDebounce`)**:
   * Menambahkan custom hook `useDebounce` (350ms) pada kolom pencarian turnamen dan jadwal.
   * Menghindari spamming query saat user mengetik cepat, siap terhubung ke database besar tanpa membebani server.

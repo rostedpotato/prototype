@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Remove X-Powered-By header for security
+  poweredByHeader: false,
+
+  experimental: {
+    // Tree-shake lucide-react icons to reduce bundle size
+    optimizePackageImports: ['lucide-react'],
+  },
 };
 
 export default nextConfig;

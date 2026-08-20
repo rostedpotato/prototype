@@ -14,7 +14,6 @@ import {
   Calendar,
   MapPin,
   Users,
-  Radio,
   ArrowLeft,
   Shield,
   Layers,

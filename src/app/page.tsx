@@ -8,15 +8,12 @@ import LiveScoreCard from '@/components/LiveScoreCard';
 import AdminScoringModal from '@/components/AdminScoringModal';
 import {
   Trophy,
-  Activity,
   Calendar,
   MapPin,
   Users,
   ChevronRight,
-  Radio,
   Shield,
   Search,
-  Sparkles,
 } from 'lucide-react';
 import { useAdminAuth } from '@/lib/authStore';
 import { useDebounce } from '@/lib/useDebounce';
