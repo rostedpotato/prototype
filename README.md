@@ -103,6 +103,8 @@ Setiap perubahan, perbaikan bug, dan penambahan fitur dicatat secara berkala di 
   * Menghapus 5 CSS custom property yang tidak digunakan dari `globals.css`.
 * **🔗 Keamanan Link Eksternal**:
   * Menambahkan `rel="noopener noreferrer"` pada semua link `target="_blank"`.
+* **📊 Integrasi Vercel Web Analytics**:
+  * Mengintegrasikan `@vercel/analytics` ke dalam `layout.tsx` untuk memantau jumlah pengunjung, page views, dan traffic turnamen secara real-time langsung di dashboard Vercel tanpa membebani performa.
 * **📋 SEO & Social Sharing**:
   * Menambahkan `metadataBase` dan `openGraph` metadata pada `layout.tsx` agar *preview link* tampil rapi di WhatsApp, Telegram, dll.
 
