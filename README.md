@@ -85,7 +85,15 @@ Platform manajemen dan *live score* turnamen Bulutangkis (Badminton) dan Padel b
 
 Setiap perubahan, perbaikan bug, dan penambahan fitur dicatat secara berkala di bawah ini:
 
-### [v1.4.0] - 2026-08-20 (Terbaru — Production Ready)
+### [v1.5.0] - 2026-08-21 (Terbaru)
+* **💾 Fitur Backup & Restore Data JSON**:
+  * Menambahkan tombol **"Backup Data JSON"** di Admin Dashboard untuk mengunduh seluruh data turnamen, bracket, skor, dan peserta ke file `.json`.
+  * Menambahkan tombol **"Restore / Import JSON"** untuk mengunggah dan memulihkan data turnamen dari file backup JSON, mempermudah migrasi antar perangkat atau tempat hosting baru.
+  * Validasi struktur file JSON otomatis sebelum data disimpan ke *storage*.
+* **🔄 Sinkronisasi Sistem Turnamen Dua Tahap (Two-Stage / Group Stage)**:
+  * Penggabungan pembaruan sistem grup dan bracket bertingkat dari GitHub.
+
+### [v1.4.0] - 2026-08-20 (Production Ready)
 * **🔴 Bug Fix Kritis — Crash pada Pencarian Jadwal**:
   * Memperbaiki `TypeError` saat mengetik pencarian di halaman jadwal ketika peserta belum terisi (*TBD*). Menambahkan *optional chaining* (`?.name?.toLowerCase()`).
 * **🧹 Pembersihan Unused Imports (11 File)**:

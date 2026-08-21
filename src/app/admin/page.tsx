@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTournaments } from '@/lib/tournamentStore';
@@ -16,12 +16,19 @@ import {
   Trash2,
   ExternalLink,
   Lock,
+  Download,
+  Upload,
+  Database,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { isAdmin, isReady } = useAdminAuth();
   const { tournaments, service } = useTournaments();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     if (isReady && !isAdmin) {
@@ -46,10 +53,63 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleExportJSON = () => {
+    try {
+      const jsonStr = service.exportData();
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      a.href = url;
+      a.download = `racket_arena_backup_${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setNotice({ type: 'success', message: 'File backup JSON berhasil diunduh!' });
+      setTimeout(() => setNotice(null), 4000);
+    } catch {
+      setNotice({ type: 'error', message: 'Gagal mengekspor data backup.' });
+      setTimeout(() => setNotice(null), 4000);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (!content) return;
+
+      if (confirm('Import file ini akan menimpa/memperbarui data turnamen lokal Anda. Lanjutkan?')) {
+        const result = service.importData(content);
+        if (result.success) {
+          setNotice({
+            type: 'success',
+            message: `Berhasil memulihkan ${result.count} turnamen dari file backup!`,
+          });
+        } else {
+          setNotice({
+            type: 'error',
+            message: `Gagal memulihkan data: ${result.error}`,
+          });
+        }
+        setTimeout(() => setNotice(null), 5000);
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="space-y-8 pb-20">
       {/* Top Admin Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20 flex-shrink-0">
             <Shield className="w-6 h-6 text-slate-950 stroke-[2.5]" />
@@ -67,7 +127,36 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center flex-wrap gap-2.5">
+          {/* Export JSON Button */}
+          <button
+            onClick={handleExportJSON}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5"
+            title="Download file backup semua turnamen (format .json)"
+          >
+            <Download className="w-4 h-4 text-cyan-400" />
+            <span>Backup Data JSON</span>
+          </button>
+
+          {/* Import JSON Button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5"
+            title="Pulihkan data turnamen dari file backup .json"
+          >
+            <Upload className="w-4 h-4 text-lime-400" />
+            <span>Restore / Import JSON</span>
+          </button>
+
+          {/* Hidden File Input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+
           <Link
             href="/admin/tournament/new"
             className="px-4 py-2.5 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 text-xs font-black shadow-lg shadow-lime-500/20 transition-all flex items-center gap-2"
@@ -77,6 +166,24 @@ export default function AdminDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Notice Alert if any */}
+      {notice && (
+        <div
+          className={`p-4 rounded-2xl border flex items-center gap-3 text-xs font-bold ${
+            notice.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+              : 'bg-red-500/10 border-red-500/30 text-red-300'
+          }`}
+        >
+          {notice.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          )}
+          <span>{notice.message}</span>
+        </div>
+      )}
 
       {/* Tournaments Management List */}
       <div className="space-y-4">

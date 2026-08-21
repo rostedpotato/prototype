@@ -122,6 +122,44 @@ export const TournamentService = {
     return INITIAL_TOURNAMENTS;
   },
 
+  exportData(): string {
+    const list = getStoredTournaments();
+    return JSON.stringify(list, null, 2);
+  },
+
+  importData(data: string | Tournament[]): { success: boolean; count?: number; error?: string } {
+    try {
+      let parsed: any;
+      if (typeof data === 'string') {
+        parsed = JSON.parse(data);
+      } else {
+        parsed = data;
+      }
+
+      if (!Array.isArray(parsed)) {
+        return { success: false, error: 'Format data tidak valid (harus berupa array turnamen).' };
+      }
+
+      const isValid = parsed.every(
+        (t) =>
+          t &&
+          typeof t.id === 'string' &&
+          typeof t.name === 'string' &&
+          Array.isArray(t.matches) &&
+          Array.isArray(t.participants)
+      );
+
+      if (!isValid) {
+        return { success: false, error: 'Struktur data turnamen dalam file tidak sesuai.' };
+      }
+
+      saveTournaments(parsed);
+      return { success: true, count: parsed.length };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Gagal memproses file JSON.' };
+    }
+  },
+
   assignMatchParticipant(
     tournamentId: string,
     matchId: string,

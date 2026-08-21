@@ -1,0 +1,11 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/admin/login/page": "app/admin/login/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/admin/tournament/[id]/page": "app/admin/tournament/[id]/page.js",
+  "/admin/tournament/new/page": "app/admin/tournament/new/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/page": "app/page.js",
+  "/tournament/[id]/page": "app/tournament/[id]/page.js"
+}
