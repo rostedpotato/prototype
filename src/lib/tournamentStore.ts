@@ -3,6 +3,7 @@
 import { Tournament, Match, SetScore, MatchStatus, Participant } from '@/types/tournament';
 import { INITIAL_TOURNAMENTS } from './initialData';
 import { calculateMatchWinner } from './scoreRules';
+import { generateKnockoutStageFromGroups } from './bracketGenerator';
 
 const STORAGE_KEY = 'racket_tournaments_v2';
 const EVENT_KEY = 'racket_tournament_updated';
@@ -269,6 +270,66 @@ export const TournamentService = {
       }
     }
 
+    // If tournament is TWO_STAGE and match was in group stage, recalculate group standings
+    if (tournament.format === 'TWO_STAGE' && currentMatch.phase === 'GROUP') {
+      const groupMatches = matches.filter((m) => m.phase === 'GROUP');
+      const updatedParticipants = tournament.participants.map((p) => {
+        const participantMatches = groupMatches.filter(
+          (m) =>
+            (m.participant1?.id === p.id || m.participant2?.id === p.id) &&
+            m.status === 'FINISHED'
+        );
+
+        let wins = 0;
+        let points = 0;
+
+        participantMatches.forEach((m) => {
+          if (m.winnerId === p.id) {
+            wins += 1;
+            points += 2; // 2 points per win
+          }
+          // Also count set scores for tie-breaking
+          m.scores.forEach((s) => {
+            if (m.participant1?.id === p.id) {
+              points += (s.score1 - s.score2) * 0.01;
+            } else if (m.participant2?.id === p.id) {
+              points += (s.score2 - s.score1) * 0.01;
+            }
+          });
+        });
+
+        const losses = participantMatches.length - wins;
+
+        return {
+          ...p,
+          groupWins: wins,
+          groupLosses: losses,
+          groupPoints: Math.round(points * 100) / 100,
+        };
+      });
+
+      // Assign group ranks
+      const groups = ['Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'];
+      groups.forEach((gName) => {
+        const inGroup = updatedParticipants.filter((p) => p.group === gName);
+        inGroup.sort((a, b) => {
+          if ((b.groupPoints || 0) !== (a.groupPoints || 0)) {
+            return (b.groupPoints || 0) - (a.groupPoints || 0);
+          }
+          if ((b.groupWins || 0) !== (a.groupWins || 0)) {
+            return (b.groupWins || 0) - (a.groupWins || 0);
+          }
+          return (a.seed || 999) - (b.seed || 999);
+        });
+
+        inGroup.forEach((p, idx) => {
+          p.groupRank = idx + 1;
+        });
+      });
+
+      tournament.participants = updatedParticipants;
+    }
+
     tournament.matches = matches;
 
     // Also update tournament status if all matches finished
@@ -278,6 +339,30 @@ export const TournamentService = {
     } else if (matches.some((m) => m.status === 'LIVE')) {
       tournament.status = 'LIVE';
     }
+
+    list[tIndex] = tournament;
+    saveTournaments(list);
+    return tournament;
+  },
+
+  generateKnockoutForTwoStage(tournamentId: string): Tournament | null {
+    const list = getStoredTournaments();
+    const tIndex = list.findIndex((t) => t.id === tournamentId);
+    if (tIndex === -1) return null;
+
+    const tournament = { ...list[tIndex] };
+    if (tournament.format !== 'TWO_STAGE') return null;
+
+    const { upperBracketMatches, bottomBracketMatches } = generateKnockoutStageFromGroups(
+      tournament.id,
+      tournament.participants,
+      tournament.courts
+    );
+
+    // Keep existing group matches and add the two knockout brackets
+    const groupMatches = tournament.matches.filter((m) => m.phase === 'GROUP');
+    tournament.matches = [...groupMatches, ...upperBracketMatches, ...bottomBracketMatches];
+    tournament.groupStageCompleted = true;
 
     list[tIndex] = tournament;
     saveTournaments(list);

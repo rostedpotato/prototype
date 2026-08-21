@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTournament } from '@/lib/tournamentStore';
@@ -8,6 +8,7 @@ import { useAdminAuth } from '@/lib/authStore';
 import BracketViewer from '@/components/BracketViewer';
 import MatchList from '@/components/MatchList';
 import AdminScoringModal from '@/components/AdminScoringModal';
+import GroupStageViewer from '@/components/GroupStageViewer';
 import { Match } from '@/types/tournament';
 import {
   Trophy,
@@ -27,8 +28,15 @@ export default function TournamentDetailPage() {
   const { tournament } = useTournament(id);
   const { isAdmin } = useAdminAuth();
 
-  const [activeTab, setActiveTab] = useState<'BRACKET' | 'MATCHES' | 'PARTICIPANTS'>('BRACKET');
+  const [activeTab, setActiveTab] = useState<'GROUP' | 'BRACKET' | 'MATCHES' | 'PARTICIPANTS'>('BRACKET');
   const [scoringModalMatch, setScoringModalMatch] = useState<Match | null>(null);
+
+  // Auto set to GROUP tab if TWO_STAGE and not yet group stage completed
+  useEffect(() => {
+    if (tournament?.format === 'TWO_STAGE' && !tournament.groupStageCompleted) {
+      setActiveTab('GROUP');
+    }
+  }, [tournament?.format, tournament?.groupStageCompleted]);
 
   if (!tournament) {
     return (
@@ -126,43 +134,65 @@ export default function TournamentDetailPage() {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+        {tournament.format === 'TWO_STAGE' && (
+          <button
+            onClick={() => setActiveTab('GROUP')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
+              activeTab === 'GROUP'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+            }`}
+          >
+            <Shield className="w-4 h-4 text-blue-400" />
+            Fase Grup & Klasemen
+          </button>
+        )}
+
         <button
           onClick={() => setActiveTab('BRACKET')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
             activeTab === 'BRACKET'
               ? 'bg-lime-500 text-slate-950 shadow-md shadow-lime-500/20'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <Layers className="w-4 h-4" />
-          Bagan Sistem Gugur (Bracket)
+          {tournament.format === 'TWO_STAGE' ? 'Bagan Knockout (Upper & Beginner)' : 'Bagan Sistem Gugur'}
         </button>
 
         <button
           onClick={() => setActiveTab('MATCHES')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
             activeTab === 'MATCHES'
               ? 'bg-lime-500 text-slate-950 shadow-md shadow-lime-500/20'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <ListOrdered className="w-4 h-4" />
-          Jadwal & Hasil Pertandingan ({tournament.matches.length})
+          Jadwal & Hasil ({tournament.matches.length})
         </button>
 
         <button
           onClick={() => setActiveTab('PARTICIPANTS')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
             activeTab === 'PARTICIPANTS'
               ? 'bg-lime-500 text-slate-950 shadow-md shadow-lime-500/20'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <Users className="w-4 h-4" />
-          Daftar Peserta ({tournament.participants.length})
+          Peserta ({tournament.participants.length})
         </button>
       </div>
+
+      {/* Tab 0: Group Stage Viewer (For TWO_STAGE tournaments) */}
+      {activeTab === 'GROUP' && tournament.format === 'TWO_STAGE' && (
+        <GroupStageViewer
+          tournament={tournament}
+          onOpenScoreControl={(m) => setScoringModalMatch(m)}
+        />
+      )}
 
       {/* Tab 1: Bracket Viewer */}
       {activeTab === 'BRACKET' && (
@@ -171,7 +201,9 @@ export default function TournamentDetailPage() {
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-amber-400" />
-                Bagan Babak Utama (Single Elimination Tree)
+                {tournament.format === 'TWO_STAGE'
+                  ? 'Bagan Babak Gugur (Upper & Beginner)'
+                  : 'Bagan Babak Utama (Single Elimination Tree)'}
               </h3>
               <span className="text-[11px] text-slate-400">
                 Geser ke samping pada layar HP untuk melihat babak selanjutnya

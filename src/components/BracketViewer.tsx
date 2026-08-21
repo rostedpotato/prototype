@@ -1,23 +1,37 @@
 'use client';
 
+import { useState } from 'react';
 import { Tournament, Match } from '@/types/tournament';
 import { useAdminAuth } from '@/lib/authStore';
-import { Trophy, SlidersHorizontal, Medal } from 'lucide-react';
+import { Trophy, SlidersHorizontal, Medal, Sparkles, Layers } from 'lucide-react';
 
 interface BracketViewerProps {
   tournament: Tournament;
   onOpenScoreControl?: (match: Match) => void;
+  defaultPhase?: 'KNOCKOUT_UPPER' | 'KNOCKOUT_BOTTOM';
 }
 
-export default function BracketViewer({ tournament, onOpenScoreControl }: BracketViewerProps) {
+export default function BracketViewer({
+  tournament,
+  onOpenScoreControl,
+  defaultPhase = 'KNOCKOUT_UPPER',
+}: BracketViewerProps) {
   const { isAdmin } = useAdminAuth();
+  const [activePhase, setActivePhase] = useState<'KNOCKOUT_UPPER' | 'KNOCKOUT_BOTTOM'>(defaultPhase);
+
+  const isTwoStage = tournament.format === 'TWO_STAGE';
+
+  // Filter matches by phase if TWO_STAGE, otherwise use all matches
+  const targetMatches = isTwoStage
+    ? tournament.matches.filter((m) => m.phase === activePhase)
+    : tournament.matches;
 
   // Group matches by round
-  const maxRound = Math.max(...tournament.matches.map((m) => m.round), 1);
+  const maxRound = Math.max(...targetMatches.map((m) => m.round), 1);
   const roundsArray = Array.from({ length: maxRound }, (_, i) => i + 1);
 
   // Find champion if final is finished
-  const finalMatch = tournament.matches.find((m) => m.round === maxRound);
+  const finalMatch = targetMatches.find((m) => m.round === maxRound);
   const champion =
     finalMatch?.status === 'FINISHED' && finalMatch.winnerId
       ? finalMatch.participant1?.id === finalMatch.winnerId
@@ -29,17 +43,81 @@ export default function BracketViewer({ tournament, onOpenScoreControl }: Bracke
 
   return (
     <div className="w-full space-y-6">
+      {/* Two-Stage Bracket Switcher */}
+      {isTwoStage && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-3 rounded-2xl">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-black text-white uppercase tracking-wider">
+              Pilih Bagan Knockout:
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActivePhase('KNOCKOUT_UPPER')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                activePhase === 'KNOCKOUT_UPPER'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 border border-blue-400'
+                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              <Trophy className="w-4 h-4 text-amber-400" />
+              <span>Bagan Upper (Top 2 Grup)</span>
+            </button>
+
+            <button
+              onClick={() => setActivePhase('KNOCKOUT_BOTTOM')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                activePhase === 'KNOCKOUT_BOTTOM'
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 border border-emerald-400'
+                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              <Medal className="w-4 h-4 text-emerald-400" />
+              <span>Bagan Beginner (Bottom 2 Grup)</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Champion Banner if final finished */}
       {champion && (
-        <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-lime-500/20 border-2 border-amber-400 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in">
+        <div
+          className={`p-5 rounded-2xl border-2 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in ${
+            activePhase === 'KNOCKOUT_UPPER' || !isTwoStage
+              ? 'bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-lime-500/20 border-amber-400'
+              : 'bg-gradient-to-r from-emerald-500/20 via-teal-500/15 to-cyan-500/20 border-emerald-400'
+          }`}
+        >
           <div className="flex items-center gap-4 text-center sm:text-left">
-            <div className="w-14 h-14 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/30 flex-shrink-0">
-              <Trophy className="w-8 h-8 stroke-[2.5]" />
+            <div
+              className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0 ${
+                activePhase === 'KNOCKOUT_UPPER' || !isTwoStage
+                  ? 'bg-amber-400 text-slate-950 shadow-amber-500/30'
+                  : 'bg-emerald-400 text-slate-950 shadow-emerald-500/30'
+              }`}
+            >
+              {activePhase === 'KNOCKOUT_UPPER' || !isTwoStage ? (
+                <Trophy className="w-8 h-8 stroke-[2.5]" />
+              ) : (
+                <Medal className="w-8 h-8 stroke-[2.5]" />
+              )}
             </div>
             <div>
-              <span className="text-[11px] font-black uppercase tracking-widest text-amber-400 flex items-center gap-1.5 justify-center sm:justify-start">
-                <Medal className="w-3.5 h-3.5" />
-                JUARA 1 / TOURNAMENT CHAMPION
+              <span
+                className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-1.5 justify-center sm:justify-start ${
+                  activePhase === 'KNOCKOUT_UPPER' || !isTwoStage
+                    ? 'text-amber-400'
+                    : 'text-emerald-400'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                {isTwoStage
+                  ? activePhase === 'KNOCKOUT_UPPER'
+                    ? 'JUARA 1 BAGAN UPPER BEGINNER'
+                    : 'JUARA 1 BAGAN BEGINNER'
+                  : 'JUARA 1 / TOURNAMENT CHAMPION'}
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-white">{champion.name}</h2>
               {champion.club && (
@@ -47,7 +125,13 @@ export default function BracketViewer({ tournament, onOpenScoreControl }: Bracke
               )}
             </div>
           </div>
-          <div className="px-4 py-1.5 rounded-full bg-amber-400/20 border border-amber-400/50 text-amber-300 text-xs font-black uppercase tracking-wider">
+          <div
+            className={`px-4 py-1.5 rounded-full border text-xs font-black uppercase tracking-wider ${
+              activePhase === 'KNOCKOUT_UPPER' || !isTwoStage
+                ? 'bg-amber-400/20 border-amber-400/50 text-amber-300'
+                : 'bg-emerald-400/20 border-emerald-400/50 text-emerald-300'
+            }`}
+          >
             🏆 Winner
           </div>
         </div>
@@ -57,7 +141,7 @@ export default function BracketViewer({ tournament, onOpenScoreControl }: Bracke
       <div className="overflow-x-auto bracket-scroll pb-6 pt-2">
         <div className="inline-flex items-stretch gap-0 min-w-[840px] px-2">
           {roundsArray.map((roundNum) => {
-            const matchesInRound = tournament.matches
+            const matchesInRound = targetMatches
               .filter((m) => m.round === roundNum)
               .sort((a, b) => a.matchOrder - b.matchOrder);
 

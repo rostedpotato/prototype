@@ -5,12 +5,18 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAdminAuth } from '@/lib/authStore';
 import { TournamentService } from '@/lib/tournamentStore';
-import { generateBracketMatches, getCategoryLabel } from '@/lib/bracketGenerator';
+import {
+  generateBracketMatches,
+  generateGroupStageMatches,
+  getCategoryLabel,
+} from '@/lib/bracketGenerator';
 import {
   SportType,
   TournamentCategory,
+  TournamentFormat,
   Participant,
   Tournament,
+  Match,
 } from '@/types/tournament';
 import {
   ArrowLeft,
@@ -19,7 +25,48 @@ import {
   Trash2,
   Sparkles,
   CheckCircle2,
+  Layers,
+  Shield,
+  Medal,
 } from 'lucide-react';
+
+const SAMPLE_16_BADMINTON: Participant[] = [
+  { id: 'p_1', name: 'Fajar Alfian / M. Rian Ardianto', player1: 'Fajar Alfian', player2: 'M. Rian Ardianto', seed: 1, club: 'PB Tangkas' },
+  { id: 'p_2', name: 'Kevin Sanjaya / Marcus Gideon', player1: 'Kevin Sanjaya', player2: 'Marcus Gideon', seed: 2, club: 'PB Djarum' },
+  { id: 'p_3', name: 'Mohammad Ahsan / Hendra Setiawan', player1: 'Mohammad Ahsan', player2: 'Hendra Setiawan', seed: 3, club: 'PB Jaya Raya' },
+  { id: 'p_4', name: 'Leo Rolly Carnando / Daniel Marthin', player1: 'Leo Rolly Carnando', player2: 'Daniel Marthin', seed: 4, club: 'PB Exist' },
+  { id: 'p_5', name: 'Bagas Maulana / M. Shohibul Fikri', player1: 'Bagas Maulana', player2: 'M. Shohibul Fikri', seed: 5, club: 'PB Djarum' },
+  { id: 'p_6', name: 'Pramudya K. / Yeremia Rambitan', player1: 'Pramudya K.', player2: 'Yeremia R.', seed: 6, club: 'PB Jaya Raya' },
+  { id: 'p_7', name: 'Sabar Karyaman / Reza Pahlevi', player1: 'Sabar Karyaman', player2: 'Reza Pahlevi', seed: 7, club: 'PB Tangkas' },
+  { id: 'p_8', name: 'Rayhan Nur Fadillah / Rahmat Hidayat', player1: 'Rayhan N. F.', player2: 'Rahmat Hidayat', seed: 8, club: 'PB Djarum' },
+  { id: 'p_9', name: 'Chico Wardoyo / Alwi Farhan', player1: 'Chico Wardoyo', player2: 'Alwi Farhan', seed: 9, club: 'PB Exist' },
+  { id: 'p_10', name: 'Christian Adinata / Yohanes Saut', player1: 'Christian Adinata', player2: 'Yohanes Saut', seed: 10, club: 'PB Tangkas' },
+  { id: 'p_11', name: 'Bobby Setiabudi / Teges Satriaji', player1: 'Bobby Setiabudi', player2: 'Teges Satriaji', seed: 11, club: 'PB Djarum' },
+  { id: 'p_12', name: 'Putra Erwiansyah / Patra Harapan', player1: 'Putra Erwiansyah', player2: 'Patra Harapan', seed: 12, club: 'PB Jaya Raya' },
+  { id: 'p_13', name: 'Raymond Indra / Nikolaus Joaquin', player1: 'Raymond Indra', player2: 'Nikolaus Joaquin', seed: 13, club: 'PB Djarum' },
+  { id: 'p_14', name: 'Anselmus Prasetya / Pulung Ramadhan', player1: 'Anselmus Prasetya', player2: 'Pulung Ramadhan', seed: 14, club: 'PB Djarum' },
+  { id: 'p_15', name: 'Adrian Pratama / Jonathan Farrell', player1: 'Adrian Pratama', player2: 'Jonathan Farrell', seed: 15, club: 'PB Jaya Raya' },
+  { id: 'p_16', name: 'Dexter Farrell / Wahyu Agung', player1: 'Dexter Farrell', player2: 'Wahyu Agung', seed: 16, club: 'PB Exist' },
+];
+
+const SAMPLE_16_PADEL: Participant[] = [
+  { id: 'p_1', name: 'Arturo Coello / Agustín Tapia', player1: 'Arturo Coello', player2: 'Agustín Tapia', seed: 1, club: 'Bali Padel Club' },
+  { id: 'p_2', name: 'Ale Galán / Juan Lebrón', player1: 'Ale Galán', player2: 'Juan Lebrón', seed: 2, club: 'Lombok Padel' },
+  { id: 'p_3', name: 'Franco Stupaczuk / Martin Di Nenno', player1: 'Franco Stupaczuk', player2: 'Martin Di Nenno', seed: 3, club: 'Canggu Arena' },
+  { id: 'p_4', name: 'Paquito Navarro / Sanyo Gutiérrez', player1: 'Paquito Navarro', player2: 'Sanyo Gutiérrez', seed: 4, club: 'Jakarta Smash' },
+  { id: 'p_5', name: 'Fede Chingotto / Javi Garrido', player1: 'Fede Chingotto', player2: 'Javi Garrido', seed: 5, club: 'Surabaya Padel' },
+  { id: 'p_6', name: 'Momo González / Alex Ruiz', player1: 'Momo González', player2: 'Alex Ruiz', seed: 6, club: 'Lombok Padel' },
+  { id: 'p_7', name: 'Coki Nieto / Jon Sanz', player1: 'Coki Nieto', player2: 'Jon Sanz', seed: 7, club: 'Bali Padel Club' },
+  { id: 'p_8', name: 'Maxi Sánchez / Lucho Capra', player1: 'Maxi Sánchez', player2: 'Lucho Capra', seed: 8, club: 'Seminyak Padel' },
+  { id: 'p_9', name: 'Lucas Campagnolo / Javi Leal', player1: 'Lucas Campagnolo', player2: 'Javi Leal', seed: 9, club: 'Jakarta Smash' },
+  { id: 'p_10', name: 'Gonzalo Rubio / Maxi Arce', player1: 'Gonzalo Rubio', player2: 'Maxi Arce', seed: 10, club: 'Bali Padel Club' },
+  { id: 'p_11', name: 'Ramiro Moyano / Xisco Gil', player1: 'Ramiro Moyano', player2: 'Xisco Gil', seed: 11, club: 'Bandung Padel' },
+  { id: 'p_12', name: 'Javier Barahona / Javi García', player1: 'Javier Barahona', player2: 'Javi García', seed: 12, club: 'Surabaya Padel' },
+  { id: 'p_13', name: 'Pincho Fernández / José Diestro', player1: 'Pincho Fernández', player2: 'José Diestro', seed: 13, club: 'Lombok Padel' },
+  { id: 'p_14', name: 'Tino Libaak / Leo Augsburger', player1: 'Tino Libaak', player2: 'Leo Augsburger', seed: 14, club: 'Bali Padel Club' },
+  { id: 'p_15', name: 'Pablo Cardona / Ivan Ramirez', player1: 'Pablo Cardona', player2: 'Ivan Ramirez', seed: 15, club: 'Jakarta Smash' },
+  { id: 'p_16', name: 'Edu Alonso / Alex Arroyo', player1: 'Edu Alonso', player2: 'Alex Arroyo', seed: 16, club: 'Seminyak Padel' },
+];
 
 export default function NewTournamentPage() {
   const router = useRouter();
@@ -33,6 +80,7 @@ export default function NewTournamentPage() {
 
   // Form states
   const [name, setName] = useState('');
+  const [format, setFormat] = useState<TournamentFormat>('TWO_STAGE');
   const [sport, setSport] = useState<SportType>('BADMINTON');
   const [category, setCategory] = useState<TournamentCategory>('MEN_DOUBLES');
   const [venue, setVenue] = useState('');
@@ -40,51 +88,58 @@ export default function NewTournamentPage() {
   const [startDate, setStartDate] = useState('2026-09-01');
   const [endDate, setEndDate] = useState('2026-09-03');
   const [description, setDescription] = useState('');
-  const [courtsText, setCourtsText] = useState('Court 1, Court 2, Court 3');
+  const [courtsText, setCourtsText] = useState('Court 1, Court 2, Court 3, Court 4');
 
-  // Participants (default 8)
-  const [participants, setParticipants] = useState<Participant[]>([
-    { id: 'p_1', name: 'Pemain 1 / Pasangan 1', player1: 'Pemain 1', seed: 1, club: 'Klub A' },
-    { id: 'p_2', name: 'Pemain 2 / Pasangan 2', player1: 'Pemain 2', seed: 8, club: 'Klub B' },
-    { id: 'p_3', name: 'Pemain 3 / Pasangan 3', player1: 'Pemain 3', seed: 4, club: 'Klub C' },
-    { id: 'p_4', name: 'Pemain 4 / Pasangan 4', player1: 'Pemain 4', seed: 5, club: 'Klub D' },
-    { id: 'p_5', name: 'Pemain 5 / Pasangan 5', player1: 'Pemain 5', seed: 6, club: 'Klub E' },
-    { id: 'p_6', name: 'Pemain 6 / Pasangan 6', player1: 'Pemain 6', seed: 3, club: 'Klub F' },
-    { id: 'p_7', name: 'Pemain 7 / Pasangan 7', player1: 'Pemain 7', seed: 7, club: 'Klub G' },
-    { id: 'p_8', name: 'Pemain 8 / Pasangan 8', player1: 'Pemain 8', seed: 2, club: 'Klub H' },
-  ]);
+  // Participants
+  const [participants, setParticipants] = useState<Participant[]>(SAMPLE_16_BADMINTON);
+
+  // When format changes, adjust participant count
+  const handleFormatChange = (newFormat: TournamentFormat) => {
+    setFormat(newFormat);
+    if (newFormat === 'TWO_STAGE') {
+      setParticipants(sport === 'BADMINTON' ? SAMPLE_16_BADMINTON : SAMPLE_16_PADEL);
+      setCourtsText('Court 1, Court 2, Court 3, Court 4');
+    } else {
+      setParticipants(
+        (sport === 'BADMINTON' ? SAMPLE_16_BADMINTON : SAMPLE_16_PADEL).slice(0, 8)
+      );
+      setCourtsText('Court 1, Court 2, Court 3');
+    }
+  };
 
   const handleFillSample = () => {
-    if (sport === 'BADMINTON') {
-      setName('Surabaya Badminton Super Series 2026');
-      setVenue('GOR Kertajaya');
-      setCity('Surabaya');
-      setDescription('Kejuaraan bulutangkis antar klub se-Jawa Timur kategori ganda.');
-      setParticipants([
-        { id: 'p_1', name: 'Anthony Ginting / Jonatan Christie', player1: 'Anthony Ginting', player2: 'Jonatan Christie', seed: 1, club: 'PB Tangkas' },
-        { id: 'p_2', name: 'Chico Wardoyo / Alwi Farhan', player1: 'Chico Wardoyo', player2: 'Alwi Farhan', seed: 8, club: 'PB Exist' },
-        { id: 'p_3', name: 'Bagas Maulana / Daniel Marthin', player1: 'Bagas Maulana', player2: 'Daniel Marthin', seed: 4, club: 'PB Djarum' },
-        { id: 'p_4', name: 'Leo Carnando / M. Shohibul Fikri', player1: 'Leo Carnando', player2: 'M. Shohibul Fikri', seed: 5, club: 'PB Djarum' },
-        { id: 'p_5', name: 'Pramudya K. / Rahmat Hidayat', player1: 'Pramudya K.', player2: 'Rahmat Hidayat', seed: 6, club: 'PB Jaya Raya' },
-        { id: 'p_6', name: 'Mohammad Ahsan / Hendra Setiawan', player1: 'Mohammad Ahsan', player2: 'Hendra Setiawan', seed: 3, club: 'PB Djarum' },
-        { id: 'p_7', name: 'Sabar Karyaman / Reza Pahlevi', player1: 'Sabar Karyaman', player2: 'Reza Pahlevi', seed: 7, club: 'PB Tangkas' },
-        { id: 'p_8', name: 'Fajar Alfian / M. Rian Ardianto', player1: 'Fajar Alfian', player2: 'M. Rian Ardianto', seed: 2, club: 'PB Jaya Raya' },
-      ]);
+    if (format === 'TWO_STAGE') {
+      if (sport === 'BADMINTON') {
+        setName('Kejuaraan Ganda Badminton 4 Grup & Double Knockout 2026');
+        setVenue('GOR Djarum Arena');
+        setCity('Kudus');
+        setDescription(
+          'Format Dua Tahap: 16 Pasangan di 4 Grup Round Robin, dilanjutkan 2 Bagan Knockout (Upper Beginner & Beginner).'
+        );
+        setParticipants(SAMPLE_16_BADMINTON);
+      } else {
+        setName('Lombok Padel Two-Stage Championship 2026');
+        setVenue('Senggigi Padel Club');
+        setCity('Lombok Barat');
+        setDescription(
+          'Format Dua Tahap: 16 Pasangan di 4 Grup Round Robin, dilanjutkan 2 Bagan Knockout (Upper & Beginner).'
+        );
+        setParticipants(SAMPLE_16_PADEL);
+      }
     } else {
-      setName('Lombok Padel Open Trophy 2026');
-      setVenue('Senggigi Padel Club');
-      setCity('Lombok Barat');
-      setDescription('Turnamen padel invitasi nasional di pulau Lombok.');
-      setParticipants([
-        { id: 'p_1', name: 'Ale Galán / Juan Lebrón', player1: 'Ale Galán', player2: 'Juan Lebrón', seed: 1, club: 'Lombok Padel' },
-        { id: 'p_2', name: 'Paquito Navarro / Sanyo Gutiérrez', player1: 'Paquito Navarro', player2: 'Sanyo Gutiérrez', seed: 8, club: 'Jakarta Smash' },
-        { id: 'p_3', name: 'Franco Stupaczuk / Martin Di Nenno', player1: 'Franco Stupaczuk', player2: 'Martin Di Nenno', seed: 4, club: 'Bali Arena' },
-        { id: 'p_4', name: 'Momo González / Alex Ruiz', player1: 'Momo González', player2: 'Alex Ruiz', seed: 5, club: 'Lombok Padel' },
-        { id: 'p_5', name: 'Fede Chingotto / Javi Garrido', player1: 'Fede Chingotto', player2: 'Javi Garrido', seed: 6, club: 'Surabaya Padel' },
-        { id: 'p_6', name: 'Jon Sanz / Coki Nieto', player1: 'Jon Sanz', player2: 'Coki Nieto', seed: 3, club: 'Jakarta Smash' },
-        { id: 'p_7', name: 'Maxi Sánchez / Lucho Capra', player1: 'Maxi Sánchez', player2: 'Lucho Capra', seed: 7, club: 'Bali Arena' },
-        { id: 'p_8', name: 'Arturo Coello / Agustín Tapia', player1: 'Arturo Coello', player2: 'Agustín Tapia', seed: 2, club: 'Senggigi Club' },
-      ]);
+      if (sport === 'BADMINTON') {
+        setName('Surabaya Badminton Super Series 2026');
+        setVenue('GOR Kertajaya');
+        setCity('Surabaya');
+        setDescription('Kejuaraan bulutangkis antar klub se-Jawa Timur kategori ganda.');
+        setParticipants(SAMPLE_16_BADMINTON.slice(0, 8));
+      } else {
+        setName('Lombok Padel Open Trophy 2026');
+        setVenue('Senggigi Padel Club');
+        setCity('Lombok Barat');
+        setDescription('Turnamen padel invitasi nasional di pulau Lombok.');
+        setParticipants(SAMPLE_16_PADEL.slice(0, 8));
+      }
     }
   };
 
@@ -100,15 +155,23 @@ export default function NewTournamentPage() {
       ...participants,
       {
         id: `p_${Date.now()}_${nextIdx}`,
-        name: `Pemain ${nextIdx}`,
-        player1: `Pemain ${nextIdx}`,
+        name: `Pasangan ${nextIdx}`,
+        player1: `Pemain ${nextIdx}A`,
+        player2: `Pemain ${nextIdx}B`,
+        seed: nextIdx,
         club: 'Klub Mandiri',
       },
     ]);
   };
 
   const handleRemoveParticipant = (index: number) => {
-    if (participants.length <= 4) {
+    if (format === 'TWO_STAGE' && participants.length <= 16) {
+      if (
+        !confirm('Sistem Dua Tahap membutuhkan tepat 16 pasangan (4 grup @ 4 tim). Tetap ingin menghapus?')
+      ) {
+        return;
+      }
+    } else if (format === 'KNOCKOUT' && participants.length <= 4) {
       alert('Minimal 4 peserta untuk bagan sistem gugur.');
       return;
     }
@@ -123,18 +186,42 @@ export default function NewTournamentPage() {
       return;
     }
 
+    if (format === 'TWO_STAGE' && participants.length < 16) {
+      alert('Sistem Dua Tahap membutuhkan minimal 16 pasangan (4 grup @ 4 pasangan). Silakan tambahkan slot peserta.');
+      return;
+    }
+
     const courts = courtsText
       .split(',')
       .map((c) => c.trim())
       .filter((c) => c.length > 0);
 
     const tournamentId = `t_${Date.now()}`;
-    const generatedMatches = generateBracketMatches(tournamentId, participants, courts);
+    let generatedMatches: Match[] = [];
+    let finalParticipants: Participant[] = participants;
+
+    if (format === 'TWO_STAGE') {
+      const result = generateGroupStageMatches(
+        tournamentId,
+        participants,
+        courts.length > 0 ? courts : ['Court 1', 'Court 2', 'Court 3', 'Court 4']
+      );
+      generatedMatches = result.matches;
+      finalParticipants = result.groupedParticipants;
+    } else {
+      generatedMatches = generateBracketMatches(
+        tournamentId,
+        participants,
+        courts.length > 0 ? courts : ['Court 1', 'Court 2']
+      );
+    }
 
     const newTournament: Tournament = {
       id: tournamentId,
       name,
       sport,
+      format,
+      groupStageCompleted: false,
       category,
       categoryLabel: getCategoryLabel(category),
       venue: venue || 'GOR Utama',
@@ -142,9 +229,18 @@ export default function NewTournamentPage() {
       startDate,
       endDate,
       status: 'UPCOMING',
-      description: description || 'Turnamen resmi dengan bagan sistem gugur (knockout).',
-      courts: courts.length > 0 ? courts : ['Court 1', 'Court 2'],
-      participants,
+      description:
+        description ||
+        (format === 'TWO_STAGE'
+          ? 'Turnamen Dua Tahap (4 Grup Round Robin ➔ 2 Bagan Knockout Upper & Beginner).'
+          : 'Turnamen resmi dengan bagan sistem gugur (knockout).'),
+      courts:
+        courts.length > 0
+          ? courts
+          : format === 'TWO_STAGE'
+          ? ['Court 1', 'Court 2', 'Court 3', 'Court 4']
+          : ['Court 1', 'Court 2'],
+      participants: finalParticipants,
       matches: generatedMatches,
       rules: {
         pointsPerSet: sport === 'BADMINTON' ? 21 : 6,
@@ -176,7 +272,7 @@ export default function NewTournamentPage() {
           className="px-3.5 py-1.5 rounded-xl bg-lime-500/20 hover:bg-lime-500/30 border border-lime-500/40 text-lime-300 text-xs font-bold transition-colors flex items-center gap-1.5"
         >
           <Sparkles className="w-4 h-4" />
-          Isi Contoh Cepat ({sport})
+          Isi Contoh Cepat ({sport} - {format === 'TWO_STAGE' ? '16 Pasangan' : '8 Pasangan'})
         </button>
       </div>
 
@@ -184,14 +280,106 @@ export default function NewTournamentPage() {
         <div className="space-y-1 border-b border-slate-800 pb-5">
           <h1 className="text-2xl font-black text-white flex items-center gap-2">
             <Trophy className="w-6 h-6 text-amber-400" />
-            Buat Turnamen Baru & Generate Bagan
+            Buat Turnamen Baru
           </h1>
           <p className="text-xs text-slate-400 font-medium">
-            Sistem akan secara otomatis menyusun bagan sistem gugur (*knockout bracket tree*) berdasarkan peserta yang didaftarkan.
+            Pilih model format turnamen dan daftarkan peserta. Sistem akan secara otomatis membentuk bagan pertandingan.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* FORMAT PERTANDINGAN SELECTION */}
+          <div className="space-y-3 bg-slate-950/80 border border-slate-800 p-5 rounded-2xl">
+            <div className="flex items-center gap-2">
+              <Layers className="w-5 h-5 text-amber-400" />
+              <h2 className="text-sm font-black text-white uppercase tracking-wider">
+                Pilih Format & Sistem Pertandingan *
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {/* Option 1: Two-Stage (Group Stage + Double Bracket) */}
+              <div
+                onClick={() => handleFormatChange('TWO_STAGE')}
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
+                  format === 'TWO_STAGE'
+                    ? 'bg-blue-600/10 border-blue-500 ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/10'
+                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                      FORMAT RESMI • 4 GRUP + 2 BAGAN
+                    </span>
+                    <h3 className="text-sm font-black text-white mt-2 flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-blue-400" />
+                      Sistem 4 Grup ➔ Double Knockout
+                    </h3>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      format === 'TWO_STAGE' ? 'border-blue-400 bg-blue-500' : 'border-slate-600'
+                    }`}
+                  >
+                    {format === 'TWO_STAGE' && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                </div>
+                <p className="text-xs text-slate-300 mt-2 font-medium">
+                  <strong>16 Pasangan</strong> dibagi ke dalam <strong>4 Grup (@ 4 Pasangan)</strong>.
+                </p>
+                <ul className="text-[11px] text-slate-400 mt-2 space-y-1 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                  <li className="text-blue-300 font-bold">
+                    • <strong>Top 2 Tiap Grup</strong> ➔ Lolos ke <strong>Bagan Upper Beginner</strong> (8 Tim)
+                  </li>
+                  <li className="text-emerald-300 font-bold">
+                    • <strong>Bottom 2 Tiap Grup</strong> ➔ Lolos ke <strong>Bagan Beginner</strong> (8 Tim)
+                  </li>
+                  <li className="text-amber-300 font-bold">
+                    • Terdapat <strong>2 Juara / Podium</strong> (Juara Upper & Juara Beginner).
+                  </li>
+                </ul>
+              </div>
+
+              {/* Option 2: Single Elimination Knockout */}
+              <div
+                onClick={() => handleFormatChange('KNOCKOUT')}
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
+                  format === 'KNOCKOUT'
+                    ? 'bg-lime-500/10 border-lime-400 ring-2 ring-lime-400/30 shadow-lg shadow-lime-500/10'
+                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-lime-500/20 text-lime-300 border border-lime-500/40">
+                      STANDAR KNOCKOUT
+                    </span>
+                    <h3 className="text-sm font-black text-white mt-2 flex items-center gap-1.5">
+                      <Medal className="w-4 h-4 text-lime-400" />
+                      Bagan Sistem Gugur Langsung
+                    </h3>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      format === 'KNOCKOUT' ? 'border-lime-400 bg-lime-400' : 'border-slate-600'
+                    }`}
+                  >
+                    {format === 'KNOCKOUT' && <div className="w-2 h-2 rounded-full bg-slate-950" />}
+                  </div>
+                </div>
+                <p className="text-xs text-slate-300 mt-2 font-medium">
+                  Bagan pohon eliminasi tunggal langsung (4, 8, atau 16 peserta).
+                </p>
+                <ul className="text-[11px] text-slate-400 mt-2 space-y-1 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                  <li>• Peserta langsung diundi ke babak Perempat Final / Semifinal</li>
+                  <li>• Pemenang pertandingan langsung melaju ke babak berikutnya</li>
+                  <li>• 1 Juara Utama</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           {/* Basic Info */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
@@ -202,7 +390,7 @@ export default function NewTournamentPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Contoh: Jakarta Badminton Open 2026"
+                placeholder="Contoh: Jakarta Badminton Double Open 2026"
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-lime-400"
                 required
               />
@@ -214,7 +402,13 @@ export default function NewTournamentPage() {
               </label>
               <select
                 value={sport}
-                onChange={(e) => setSport(e.target.value as SportType)}
+                onChange={(e) => {
+                  const s = e.target.value as SportType;
+                  setSport(s);
+                  if (format === 'TWO_STAGE') {
+                    setParticipants(s === 'BADMINTON' ? SAMPLE_16_BADMINTON : SAMPLE_16_PADEL);
+                  }
+                }}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-lime-400"
               >
                 <option value="BADMINTON">🏸 Bulutangkis / Badminton (21 Poin)</option>
@@ -231,12 +425,12 @@ export default function NewTournamentPage() {
                 onChange={(e) => setCategory(e.target.value as TournamentCategory)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-lime-400"
               >
-                <option value="MEN_DOUBLES">Ganda Putra (Men Doubles)</option>
-                <option value="WOMEN_DOUBLES">Ganda Putri (Women Doubles)</option>
-                <option value="MIXED_DOUBLES">Ganda Campuran (Mixed Doubles)</option>
-                <option value="OPEN_DOUBLES">Ganda Open (Padel/Badminton)</option>
-                <option value="MEN_SINGLES">Tunggal Putra (Men Singles)</option>
-                <option value="WOMEN_SINGLES">Tunggal Putri (Women Singles)</option>
+                <option value="MEN_DOUBLES">Ganda Putra (Men Doubles / MD)</option>
+                <option value="WOMEN_DOUBLES">Ganda Putri (Women Doubles / WD)</option>
+                <option value="MIXED_DOUBLES">Ganda Campuran (Mixed Doubles / XD)</option>
+                <option value="OPEN_DOUBLES">Ganda Open (Padel / Badminton)</option>
+                <option value="MEN_SINGLES">Tunggal Putra (Men Singles / MS)</option>
+                <option value="WOMEN_SINGLES">Tunggal Putri (Women Singles / WS)</option>
               </select>
             </div>
 
@@ -300,7 +494,7 @@ export default function NewTournamentPage() {
                 type="text"
                 value={courtsText}
                 onChange={(e) => setCourtsText(e.target.value)}
-                placeholder="Contoh: Court 1, Court 2, Court 3"
+                placeholder="Contoh: Court 1, Court 2, Court 3, Court 4"
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
               />
             </div>
@@ -321,19 +515,24 @@ export default function NewTournamentPage() {
 
           {/* Participants Seeding */}
           <div className="space-y-4 pt-4 border-t border-slate-800">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-bold text-white">
-                  Daftar Peserta & Seeding Bagan ({participants.length} Peserta)
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>Daftar Peserta & Seeding</span>
+                  <span className="px-2 py-0.5 rounded-full bg-slate-800 text-lime-400 text-xs font-black">
+                    {participants.length} Pasangan
+                  </span>
                 </h3>
-                <p className="text-xs text-slate-400">
-                  Untuk bagan sistem gugur ideal, disarankan 4, 8, atau 16 peserta.
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {format === 'TWO_STAGE'
+                    ? 'Sistem Dua Tahap membagi 16 pasangan secara otomatis ke 4 grup seimbang berdasarkan urutan Seed.'
+                    : 'Untuk bagan sistem gugur standar, disarankan 4, 8, atau 16 peserta.'}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleAddParticipant}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 self-start sm:self-auto"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Tambah Slot
@@ -376,7 +575,7 @@ export default function NewTournamentPage() {
                           e.target.value ? parseInt(e.target.value) : undefined
                         )
                       }
-                      placeholder="Seed (1-8, Opsional)"
+                      placeholder="Seed (1-16)"
                       className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-lime-400"
                     />
                   </div>
@@ -406,7 +605,11 @@ export default function NewTournamentPage() {
               className="px-6 py-3 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 text-xs font-black shadow-lg shadow-lime-500/20 transition-all flex items-center gap-2"
             >
               <CheckCircle2 className="w-4 h-4 stroke-[3]" />
-              <span>Simpan & Generate Bagan Turnamen</span>
+              <span>
+                {format === 'TWO_STAGE'
+                  ? 'Simpan & Bentuk 4 Grup Round Robin'
+                  : 'Simpan & Generate Bagan Turnamen'}
+              </span>
             </button>
           </div>
         </form>

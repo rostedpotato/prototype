@@ -86,12 +86,18 @@ Platform manajemen dan *live score* turnamen Bulutangkis (Badminton) dan Padel b
 Setiap perubahan, perbaikan bug, dan penambahan fitur dicatat secara berkala di bawah ini:
 
 ### [v1.5.0] - 2026-08-21 (Terbaru)
+* **🏆 Sistem Turnamen Dua Tahap (4 Grup Round Robin + Double Knockout)**:
+  * **Pilihan Format di Form Turnamen Baru**: Admin dapat memilih antara *Bagan Sistem Gugur Langsung (Knockout)* atau *Sistem Dua Tahap (4 Grup @ 4 Pasangan = 16 Pasangan)*.
+  * **Klasemen Otomatis (*Auto Standings*)**: Menghitung main (*P*), menang (*W*), kalah (*L*), dan poin (*Pts*) untuk setiap grup secara otomatis saat skor di-update.
+  * **Kualifikasi Dua Bagan**:
+    * **Top 2 Tiap Grup (8 Pasangan)** ➔ Melaju ke **Bagan Upper Beginner** (Memperebutkan Juara 1 Upper).
+    * **Bottom 2 Tiap Grup (8 Pasangan)** ➔ Melaju ke **Bagan Beginner** (Memperebutkan Juara 1 Beginner).
+  * **Komponen Baru `GroupStageViewer`**: Tampilan visual klasemen 4 grup interaktif dan jadwal per grup.
+  * **Podium Ganda**: Dukungan penobatan 2 juara di bagan yang berbeda.
 * **💾 Fitur Backup & Restore Data JSON**:
   * Menambahkan tombol **"Backup Data JSON"** di Admin Dashboard untuk mengunduh seluruh data turnamen, bracket, skor, dan peserta ke file `.json`.
   * Menambahkan tombol **"Restore / Import JSON"** untuk mengunggah dan memulihkan data turnamen dari file backup JSON, mempermudah migrasi antar perangkat atau tempat hosting baru.
   * Validasi struktur file JSON otomatis sebelum data disimpan ke *storage*.
-* **🔄 Sinkronisasi Sistem Turnamen Dua Tahap (Two-Stage / Group Stage)**:
-  * Penggabungan pembaruan sistem grup dan bracket bertingkat dari GitHub.
 
 ### [v1.4.0] - 2026-08-20 (Production Ready)
 * **🔴 Bug Fix Kritis — Crash pada Pencarian Jadwal**:

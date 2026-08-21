@@ -7,6 +7,7 @@ import { useTournament } from '@/lib/tournamentStore';
 import { useAdminAuth } from '@/lib/authStore';
 import BracketViewer from '@/components/BracketViewer';
 import AdminScoringModal from '@/components/AdminScoringModal';
+import GroupStageViewer from '@/components/GroupStageViewer';
 import { Match } from '@/types/tournament';
 import {
   ArrowLeft,
@@ -17,6 +18,7 @@ import {
   Calendar,
   MapPin,
   Lock,
+  Shield,
 } from 'lucide-react';
 
 export default function AdminTournamentManagePage() {
@@ -26,8 +28,15 @@ export default function AdminTournamentManagePage() {
   const { tournament, service } = useTournament(id);
   const { isAdmin, isReady } = useAdminAuth();
 
-  const [activeTab, setActiveTab] = useState<'BRACKET' | 'MATCHES' | 'SETTINGS'>('BRACKET');
+  const [activeTab, setActiveTab] = useState<'GROUP' | 'BRACKET' | 'MATCHES'>('BRACKET');
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+
+  // Auto set to GROUP tab if TWO_STAGE and not yet group stage completed
+  useEffect(() => {
+    if (tournament?.format === 'TWO_STAGE' && !tournament.groupStageCompleted) {
+      setActiveTab('GROUP');
+    }
+  }, [tournament?.format, tournament?.groupStageCompleted]);
 
   useEffect(() => {
     if (isReady && !isAdmin) {
@@ -146,23 +155,37 @@ export default function AdminTournamentManagePage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      {/* TABS NAVIGATION */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+        {tournament.format === 'TWO_STAGE' && (
+          <button
+            onClick={() => setActiveTab('GROUP')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
+              activeTab === 'GROUP'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+            }`}
+          >
+            <Shield className="w-4 h-4 text-blue-400" />
+            Fase Grup & Klasemen
+          </button>
+        )}
+
         <button
           onClick={() => setActiveTab('BRACKET')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
             activeTab === 'BRACKET'
               ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <Layers className="w-4 h-4" />
-          Bagan & Live Scoring Wasit
+          {tournament.format === 'TWO_STAGE' ? 'Bagan Knockout & Wasit' : 'Bagan & Live Scoring Wasit'}
         </button>
 
         <button
           onClick={() => setActiveTab('MATCHES')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
             activeTab === 'MATCHES'
               ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -172,6 +195,14 @@ export default function AdminTournamentManagePage() {
           Atur Jadwal & Lapangan ({tournament.matches.length})
         </button>
       </div>
+
+      {/* TAB 0: GROUP STAGE VIEWER (For TWO_STAGE tournaments) */}
+      {activeTab === 'GROUP' && tournament.format === 'TWO_STAGE' && (
+        <GroupStageViewer
+          tournament={tournament}
+          onOpenScoreControl={(m) => setSelectedMatch(m)}
+        />
+      )}
 
       {/* TAB 1: BRACKET WITH CLICK-TO-SCORE */}
       {activeTab === 'BRACKET' && (
