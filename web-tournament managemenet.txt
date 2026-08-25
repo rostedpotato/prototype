@@ -1,0 +1,28 @@
+register on web
+sector(dropdown)
+nama tim
+nama1
+nama2 
+id reclub1
+id reclub2
+nomor whatsapp 
+
+term&condition
+
+
+
+score padel best of 5 group stage
+quarter best of 5
+semifinal first to 4
+final first to 6
+
+wasit, time,and court setting
+
+
+role based
+
+
+print template scoring 
+
+
+background putih

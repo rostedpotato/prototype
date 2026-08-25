@@ -89,6 +89,16 @@ export default function HomePage() {
           <p className="text-xs sm:text-sm text-slate-400 font-medium max-w-2xl leading-relaxed">
             Pantau bagan sistem gugur (*knockout*), jadwal pertandingan per lapangan, dan skor langsung (*live score*) secara real-time.
           </p>
+
+          <div className="pt-2">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-emerald-500/20"
+            >
+              <Users className="w-4 h-4" />
+              Pendaftaran Turnamen Publik
+            </Link>
+          </div>
         </div>
       </section>
 

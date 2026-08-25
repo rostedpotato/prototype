@@ -28,7 +28,7 @@ export default function AdminTournamentManagePage() {
   const { tournament, service } = useTournament(id);
   const { isAdmin, isReady } = useAdminAuth();
 
-  const [activeTab, setActiveTab] = useState<'GROUP' | 'BRACKET' | 'MATCHES'>('BRACKET');
+  const [activeTab, setActiveTab] = useState<'GROUP' | 'BRACKET' | 'MATCHES' | 'VERIFICATION'>('BRACKET');
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
 
   // Auto set to GROUP tab if TWO_STAGE and not yet group stage completed
@@ -157,7 +157,7 @@ export default function AdminTournamentManagePage() {
 
       {/* TABS NAVIGATION */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
-        {tournament.format === 'TWO_STAGE' && (
+        {tournament.format?.startsWith('TWO_STAGE') && (
           <button
             onClick={() => setActiveTab('GROUP')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
@@ -180,7 +180,7 @@ export default function AdminTournamentManagePage() {
           }`}
         >
           <Layers className="w-4 h-4" />
-          {tournament.format === 'TWO_STAGE' ? 'Bagan Knockout & Wasit' : 'Bagan & Live Scoring Wasit'}
+          {tournament.format?.startsWith('TWO_STAGE') ? 'Bagan Knockout & Wasit' : 'Bagan & Live Scoring Wasit'}
         </button>
 
         <button
@@ -194,14 +194,62 @@ export default function AdminTournamentManagePage() {
           <Calendar className="w-4 h-4" />
           Atur Jadwal & Lapangan ({tournament.matches.length})
         </button>
+        <button
+          onClick={() => setActiveTab('VERIFICATION')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
+            activeTab === 'VERIFICATION'
+              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+          }`}
+        >
+          <Shield className="w-4 h-4" />
+          Verifikasi Pendaftaran ({(tournament.registrations || []).filter(r => r.status === 'PENDING').length})
+        </button>
       </div>
 
       {/* TAB 0: GROUP STAGE VIEWER (For TWO_STAGE tournaments) */}
-      {activeTab === 'GROUP' && tournament.format === 'TWO_STAGE' && (
-        <GroupStageViewer
-          tournament={tournament}
-          onOpenScoreControl={(m) => setSelectedMatch(m)}
-        />
+      {activeTab === 'GROUP' && tournament.format?.startsWith('TWO_STAGE') && (
+        <div className="space-y-4">
+          {tournament.matches.length === 0 && tournament.participants.length === 16 && (
+            <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-2xl flex items-center justify-between">
+              <div className="text-sm text-blue-300">
+                16 Peserta telah disetujui. Silakan acak peserta ke dalam 4 grup untuk memulai fase grup.
+              </div>
+              <button
+                onClick={() => {
+                  if (confirm('Acak 16 peserta ini ke dalam 4 Grup sekarang?')) {
+                    const result = import('@/lib/bracketGenerator').then(m => m.generateGroupStageMatches(
+                      tournament.id,
+                      tournament.participants,
+                      tournament.courts.length > 0 ? tournament.courts : ['Court 1', 'Court 2', 'Court 3', 'Court 4']
+                    ));
+                    result.then(res => {
+                       service.update(tournament.id, {
+                         participants: res.groupedParticipants,
+                         matches: res.matches
+                       });
+                    });
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl"
+              >
+                Acak & Generate Grup
+              </button>
+            </div>
+          )}
+          {tournament.matches.length === 0 && tournament.participants.length !== 16 && (
+            <div className="p-4 bg-slate-800 text-center text-slate-400 rounded-2xl text-sm">
+              Menunggu pendaftaran. Turnamen ini membutuhkan tepat 16 peserta yang disetujui untuk memulai Fase Grup. (Saat ini: {tournament.participants.length}/16)
+            </div>
+          )}
+          
+          {tournament.matches.length > 0 && (
+            <GroupStageViewer
+              tournament={tournament}
+              onOpenScoreControl={(m) => setSelectedMatch(m)}
+            />
+          )}
+        </div>
       )}
 
       {/* TAB 1: BRACKET WITH CLICK-TO-SCORE */}
@@ -292,6 +340,72 @@ export default function AdminTournamentManagePage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: VERIFICATION */}
+      {activeTab === 'VERIFICATION' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden">
+          <div className="p-4 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-white">Verifikasi Pendaftaran</h3>
+            <span className="text-xs text-slate-400">Total {tournament.registrations?.length || 0} Pendaftar</span>
+          </div>
+
+          <div className="divide-y divide-slate-800">
+            {(!tournament.registrations || tournament.registrations.length === 0) ? (
+              <div className="p-8 text-center text-slate-400 text-sm">
+                Belum ada data pendaftaran masuk.
+              </div>
+            ) : (
+              tournament.registrations.map((reg) => (
+                <div key={reg.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">{reg.teamName}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        reg.status === 'PENDING' ? 'bg-amber-500/20 text-amber-400' :
+                        reg.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' :
+                        'bg-red-500/20 text-red-400'
+                      }`}>
+                        {reg.status}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-400">
+                      <div><span className="text-slate-500">Sektor:</span> {reg.sector}</div>
+                      <div><span className="text-slate-500">WA:</span> {reg.whatsapp}</div>
+                      <div><span className="text-slate-500">P1:</span> {reg.player1Name} {reg.reclubId1 && `(${reg.reclubId1})`}</div>
+                      <div><span className="text-slate-500">P2:</span> {reg.player2Name || '-'} {reg.reclubId2 && `(${reg.reclubId2})`}</div>
+                    </div>
+                  </div>
+                  
+                  {reg.status === 'PENDING' && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          if (confirm('Terima pendaftaran ini?')) {
+                            service.processRegistration(tournament.id, reg.id, 'APPROVED');
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-colors"
+                      >
+                        Terima
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm('Tolak pendaftaran ini?')) {
+                            service.processRegistration(tournament.id, reg.id, 'REJECTED');
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-400 text-xs font-bold transition-colors"
+                      >
+                        Tolak
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}

@@ -8,9 +8,25 @@ export type TournamentCategory =
   | 'MIXED_DOUBLES'
   | 'OPEN_DOUBLES';
 
-export type TournamentFormat = 'KNOCKOUT' | 'TWO_STAGE';
+export type TournamentFormat = 'KNOCKOUT' | 'TWO_STAGE' | 'TWO_STAGE_PADEL_CUSTOM';
 
 export type MatchStatus = 'UPCOMING' | 'LIVE' | 'FINISHED' | 'WALKOVER';
+
+export type RegistrationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface RegistrationRequest {
+  id: string;
+  tournamentId: string;
+  sector: string; // e.g. "Beginner Men Double", "Beginner Women Double Padel"
+  teamName: string;
+  player1Name: string;
+  player2Name: string;
+  reclubId1: string;
+  reclubId2: string;
+  whatsapp: string;
+  status: RegistrationStatus;
+  createdAt: string;
+}
 
 export interface Participant {
   id: string;
@@ -19,6 +35,9 @@ export interface Participant {
   player2?: string;
   seed?: number;
   club?: string;
+  reclubId1?: string;
+  reclubId2?: string;
+  whatsapp?: string;
   // For Two-Stage Tournament
   group?: string; // 'Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'
   groupRank?: number; // 1, 2, 3, 4 - final ranking in group stage
@@ -76,9 +95,11 @@ export interface Tournament {
     maxSets: number; // usually 3 (best of 3)
     deuceMargin: number; // 2 points margin
     maxPointCap?: number; // 30 for badminton
+    customPadelScoring?: boolean; // Padel best of 5 (Grp/QF: 3, SF: 4, F: 6)
   };
   // For Two-Stage Tournament
   format?: TournamentFormat; // 'KNOCKOUT' or 'TWO_STAGE'
   groupStageCompleted?: boolean; // Whether group stage is finished
+  registrations?: RegistrationRequest[]; // Pending/Approved/Rejected registrations
   createdAt: string;
 }

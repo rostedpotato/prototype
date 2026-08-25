@@ -85,7 +85,30 @@ Platform manajemen dan *live score* turnamen Bulutangkis (Badminton) dan Padel b
 
 Setiap perubahan, perbaikan bug, dan penambahan fitur dicatat secara berkala di bawah ini:
 
-### [v1.5.0] - 2026-08-21 (Terbaru)
+### [v1.7.0] - 2026-08-25 (Terbaru)
+* **🌐 Registrasi Global (Sektor Dinamis)**:
+  * Mengubah sistem registrasi menjadi satu URL global (`/register`).
+  * Peserta memilih **Sektor** (yang merupakan kumpulan turnamen yang dibuat oleh admin seperti "Padel Ganda Putra Pemula", dll).
+* **🎾 Template Padel Kustom (Two-Stage Custom Scoring)**:
+  * Menambahkan opsi format turnamen baru: **Sistem 2 Tahap (Scoring Khusus Padel)**.
+  * Turnamen dibuat kosong, menunggu 16 peserta dari daftar tunggu (Waiting List) mendaftar dan disetujui.
+  * Terdapat fitur **"Acak & Generate Grup"** di halaman Admin jika 16 pendaftar telah terverifikasi.
+  * **Sistem Poin Dinamis**:
+    * Fase Grup & Quarter Final: Best of 5 Games (First to 3).
+    * Semifinal: First to 4 Games.
+    * Final: First to 6 Games.
+
+### [v1.6.0] - 2026-08-25
+* **📝 Fitur Pendaftaran Turnamen Publik (Registrasi Web)**:
+  * Menambahkan halaman form pendaftaran publik di `/tournament/[id]/register`.
+  * Form mencakup data: Kategori/Sektor, Nama Tim, Nama Pemain 1 & 2, Reclub ID (Opsional), Nomor WhatsApp, dan Checklist Persetujuan Syarat & Ketentuan.
+  * Menambahkan tombol pintas "Daftar Turnamen" di halaman utama penonton.
+* **🛡️ Tab Verifikasi Pendaftaran Admin**:
+  * Menambahkan tab **"Verifikasi Pendaftaran"** di Dashboard Admin.
+  * Admin dapat melihat semua data pendaftar yang masuk dan melakukan verifikasi manual (klik **"Terima"** atau **"Tolak"**).
+  * Tim yang disetujui (*Approved*) akan secara otomatis masuk ke daftar peserta turnamen tanpa perlu diinput ulang oleh admin.
+
+### [v1.5.0] - 2026-08-21
 * **🏆 Sistem Turnamen Dua Tahap (4 Grup Round Robin + Double Knockout)**:
   * **Pilihan Format di Form Turnamen Baru**: Admin dapat memilih antara *Bagan Sistem Gugur Langsung (Knockout)* atau *Sistem Dua Tahap (4 Grup @ 4 Pasangan = 16 Pasangan)*.
   * **Klasemen Otomatis (*Auto Standings*)**: Menghitung main (*P*), menang (*W*), kalah (*L*), dan poin (*Pts*) untuk setiap grup secara otomatis saat skor di-update.

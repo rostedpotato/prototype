@@ -130,12 +130,21 @@ export default function TournamentDetailPage() {
               </span>
             </div>
           </div>
+
+          <div className="pt-4 border-t border-slate-800/50 flex justify-end">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-xl text-sm font-bold transition-colors shadow-lg shadow-emerald-500/20"
+            >
+              Daftar Turnamen
+            </Link>
+          </div>
         </div>
       </div>
 
       {/* Tabs Navigation */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
-        {tournament.format === 'TWO_STAGE' && (
+        {tournament.format?.startsWith('TWO_STAGE') && (
           <button
             onClick={() => setActiveTab('GROUP')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
@@ -158,7 +167,7 @@ export default function TournamentDetailPage() {
           }`}
         >
           <Layers className="w-4 h-4" />
-          {tournament.format === 'TWO_STAGE' ? 'Bagan Knockout (Upper & Beginner)' : 'Bagan Sistem Gugur'}
+          {tournament.format?.startsWith('TWO_STAGE') ? 'Bagan Knockout (Upper & Beginner)' : 'Bagan Sistem Gugur'}
         </button>
 
         <button
@@ -187,7 +196,7 @@ export default function TournamentDetailPage() {
       </div>
 
       {/* Tab 0: Group Stage Viewer (For TWO_STAGE tournaments) */}
-      {activeTab === 'GROUP' && tournament.format === 'TWO_STAGE' && (
+      {activeTab === 'GROUP' && tournament.format?.startsWith('TWO_STAGE') && (
         <GroupStageViewer
           tournament={tournament}
           onOpenScoreControl={(m) => setScoringModalMatch(m)}

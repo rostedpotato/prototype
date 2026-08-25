@@ -78,9 +78,20 @@ export default function AdminScoringModal({
 
   if (!isOpen || !match || !tournament) return null;
 
+  let targetGames: number | undefined = undefined;
+  if (sport === 'PADEL' && tournament.rules.customPadelScoring) {
+    if (match.roundName === 'Final') {
+      targetGames = 6;
+    } else if (match.roundName === 'Semifinal') {
+      targetGames = 4;
+    } else {
+      targetGames = 3; // Best of 5 games (first to 3)
+    }
+  }
+
   const currentSetScore = scores[activeSet - 1] || { setNumber: activeSet, score1: 0, score2: 0 };
-  const currentSetStatus = checkSetStatus(sport, currentSetScore.score1, currentSetScore.score2);
-  const matchWinnerStatus = calculateMatchWinner(sport, scores, 2);
+  const currentSetStatus = checkSetStatus(sport, currentSetScore.score1, currentSetScore.score2, targetGames);
+  const matchWinnerStatus = calculateMatchWinner(sport, scores, 2, targetGames);
 
   const p1 = tournament.participants.find((p) => p.id === p1Id) || match.participant1;
   const p2 = tournament.participants.find((p) => p.id === p2Id) || match.participant2;
@@ -89,7 +100,7 @@ export default function AdminScoringModal({
     setRuleNotice(null);
 
     if (delta > 0) {
-      const check = canIncrementScore(sport, currentSetScore.score1, currentSetScore.score2, team);
+      const check = canIncrementScore(sport, currentSetScore.score1, currentSetScore.score2, team, targetGames);
       if (!check.allowed) {
         setRuleNotice(check.reason || 'Poin tidak dapat ditambahkan.');
         return;

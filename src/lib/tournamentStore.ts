@@ -103,6 +103,59 @@ export const TournamentService = {
     return list[index];
   },
 
+  submitRegistration(tournamentId: string, payload: Omit<import('@/types/tournament').RegistrationRequest, 'id' | 'tournamentId' | 'status' | 'createdAt'>): boolean {
+    const list = getStoredTournaments();
+    const index = list.findIndex((t) => t.id === tournamentId);
+    if (index === -1) return false;
+
+    const t = list[index];
+    const newReg: import('@/types/tournament').RegistrationRequest = {
+      ...payload,
+      id: crypto.randomUUID(),
+      tournamentId,
+      status: 'PENDING',
+      createdAt: new Date().toISOString()
+    };
+    
+    t.registrations = [...(t.registrations || []), newReg];
+    list[index] = t;
+    saveTournaments(list);
+    return true;
+  },
+
+  processRegistration(tournamentId: string, registrationId: string, status: import('@/types/tournament').RegistrationStatus): boolean {
+    const list = getStoredTournaments();
+    const index = list.findIndex((t) => t.id === tournamentId);
+    if (index === -1) return false;
+
+    const t = list[index];
+    if (!t.registrations) return false;
+
+    const regIndex = t.registrations.findIndex(r => r.id === registrationId);
+    if (regIndex === -1) return false;
+
+    const reg = t.registrations[regIndex];
+    reg.status = status;
+
+    if (status === 'APPROVED') {
+      const newParticipant: import('@/types/tournament').Participant = {
+        id: crypto.randomUUID(),
+        name: reg.teamName,
+        player1: reg.player1Name,
+        player2: reg.player2Name,
+        reclubId1: reg.reclubId1,
+        reclubId2: reg.reclubId2,
+        whatsapp: reg.whatsapp,
+        club: reg.sector // Store sector info in club field or maybe we should add sector to participant? For now using club.
+      };
+      t.participants = [...t.participants, newParticipant];
+    }
+
+    list[index] = t;
+    saveTournaments(list);
+    return true;
+  },
+
   delete(id: string): boolean {
     const list = getStoredTournaments();
     const filtered = list.filter((t) => t.id !== id);

@@ -82,6 +82,7 @@ export default function NewTournamentPage() {
   const [name, setName] = useState('');
   const [format, setFormat] = useState<TournamentFormat>('TWO_STAGE');
   const [sport, setSport] = useState<SportType>('BADMINTON');
+  const [customPadelScoring, setCustomPadelScoring] = useState(false);
   const [category, setCategory] = useState<TournamentCategory>('MEN_DOUBLES');
   const [venue, setVenue] = useState('');
   const [city, setCity] = useState('');
@@ -96,7 +97,10 @@ export default function NewTournamentPage() {
   // When format changes, adjust participant count
   const handleFormatChange = (newFormat: TournamentFormat) => {
     setFormat(newFormat);
-    if (newFormat === 'TWO_STAGE') {
+    if (newFormat === 'TWO_STAGE_PADEL_CUSTOM') {
+      setParticipants([]); // Start empty for registration workflow
+      setCourtsText('Court 1, Court 2, Court 3, Court 4');
+    } else if (newFormat === 'TWO_STAGE') {
       setParticipants(sport === 'BADMINTON' ? SAMPLE_16_BADMINTON : SAMPLE_16_PADEL);
       setCourtsText('Court 1, Court 2, Court 3, Court 4');
     } else {
@@ -200,7 +204,11 @@ export default function NewTournamentPage() {
     let generatedMatches: Match[] = [];
     let finalParticipants: Participant[] = participants;
 
-    if (format === 'TWO_STAGE') {
+    if (format === 'TWO_STAGE_PADEL_CUSTOM') {
+      // Start empty, admin will generate groups later when 16 participants register
+      generatedMatches = [];
+      finalParticipants = [];
+    } else if (format === 'TWO_STAGE') {
       const result = generateGroupStageMatches(
         tournamentId,
         participants,
@@ -247,6 +255,7 @@ export default function NewTournamentPage() {
         maxSets: 3,
         deuceMargin: 2,
         maxPointCap: sport === 'BADMINTON' ? 30 : undefined,
+        customPadelScoring: format === 'TWO_STAGE_PADEL_CUSTOM',
       },
       createdAt: new Date().toISOString(),
     };
@@ -377,6 +386,45 @@ export default function NewTournamentPage() {
                   <li>• 1 Juara Utama</li>
                 </ul>
               </div>
+
+              {/* Option 3: Two-Stage Padel Custom */}
+              {sport === 'PADEL' && (
+                <div
+                  onClick={() => handleFormatChange('TWO_STAGE_PADEL_CUSTOM')}
+                  className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
+                    format === 'TWO_STAGE_PADEL_CUSTOM'
+                      ? 'bg-purple-600/10 border-purple-500 ring-2 ring-purple-500/30 shadow-lg shadow-purple-500/10'
+                      : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                        TWO-STAGE PADEL CUSTOM
+                      </span>
+                      <h3 className="text-sm font-black text-white mt-2 flex items-center gap-1.5">
+                        <Trophy className="w-4 h-4 text-purple-400" />
+                        Sistem 2 Tahap (Scoring Khusus)
+                      </h3>
+                    </div>
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        format === 'TWO_STAGE_PADEL_CUSTOM' ? 'border-purple-400 bg-purple-500' : 'border-slate-600'
+                      }`}
+                    >
+                      {format === 'TWO_STAGE_PADEL_CUSTOM' && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-2 font-medium">
+                    Template khusus dengan target *games* berbeda per fase.
+                  </p>
+                  <ul className="text-[11px] text-slate-400 mt-2 space-y-1 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                    <li>• <strong>Group & Quarter:</strong> Best of 5 (First to 3 Games)</li>
+                    <li>• <strong>Semifinal:</strong> First to 4 Games</li>
+                    <li>• <strong>Final:</strong> First to 6 Games</li>
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
 
