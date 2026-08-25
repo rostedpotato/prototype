@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Match, SetScore, MatchStatus, SportType } from '@/types/tournament';
 import { TournamentService, useTournament } from '@/lib/tournamentStore';
+import { useAdminAuth } from '@/lib/authStore';
 import {
   checkSetStatus,
   canIncrementScore,
@@ -37,6 +38,7 @@ export default function AdminScoringModal({
   onClose,
 }: AdminScoringModalProps) {
   const { tournament } = useTournament(tournamentId);
+  const { isAdmin } = useAdminAuth();
 
   const [activeSet, setActiveSet] = useState<number>(1);
   const [scores, setScores] = useState<SetScore[]>([
@@ -76,7 +78,7 @@ export default function AdminScoringModal({
     }
   }, [match]);
 
-  if (!isOpen || !match || !tournament) return null;
+  if (!isOpen || !match || !tournament || !isAdmin) return null;
 
   let targetGames: number | undefined = undefined;
   if (sport === 'PADEL' && tournament.rules.customPadelScoring) {

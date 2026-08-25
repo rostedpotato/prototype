@@ -8,11 +8,7 @@ import { TournamentService } from '@/lib/tournamentStore';
 export default function Navbar() {
   const { isAdmin, logout } = useAdminAuth();
 
-  const handleReset = () => {
-    if (confirm('Kembalikan data turnamen ke data demo awal?')) {
-      TournamentService.resetDefaults();
-    }
-  };
+
 
   return (
     <header className="sticky top-0 z-40 bg-[#0c121e]/90 backdrop-blur-md border-b border-slate-800">
@@ -60,14 +56,7 @@ export default function Navbar() {
 
           {/* Right Action Buttons */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleReset}
-              title="Reset data demo"
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors text-xs flex items-center gap-1.5"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span className="hidden sm:inline">Reset Demo</span>
-            </button>
+
 
             {isAdmin ? (
               <div className="flex items-center gap-2">
