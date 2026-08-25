@@ -30,43 +30,6 @@ import {
   Medal,
 } from 'lucide-react';
 
-const SAMPLE_16_BADMINTON: Participant[] = [
-  { id: 'p_1', name: 'Fajar Alfian / M. Rian Ardianto', player1: 'Fajar Alfian', player2: 'M. Rian Ardianto', seed: 1, club: 'PB Tangkas' },
-  { id: 'p_2', name: 'Kevin Sanjaya / Marcus Gideon', player1: 'Kevin Sanjaya', player2: 'Marcus Gideon', seed: 2, club: 'PB Djarum' },
-  { id: 'p_3', name: 'Mohammad Ahsan / Hendra Setiawan', player1: 'Mohammad Ahsan', player2: 'Hendra Setiawan', seed: 3, club: 'PB Jaya Raya' },
-  { id: 'p_4', name: 'Leo Rolly Carnando / Daniel Marthin', player1: 'Leo Rolly Carnando', player2: 'Daniel Marthin', seed: 4, club: 'PB Exist' },
-  { id: 'p_5', name: 'Bagas Maulana / M. Shohibul Fikri', player1: 'Bagas Maulana', player2: 'M. Shohibul Fikri', seed: 5, club: 'PB Djarum' },
-  { id: 'p_6', name: 'Pramudya K. / Yeremia Rambitan', player1: 'Pramudya K.', player2: 'Yeremia R.', seed: 6, club: 'PB Jaya Raya' },
-  { id: 'p_7', name: 'Sabar Karyaman / Reza Pahlevi', player1: 'Sabar Karyaman', player2: 'Reza Pahlevi', seed: 7, club: 'PB Tangkas' },
-  { id: 'p_8', name: 'Rayhan Nur Fadillah / Rahmat Hidayat', player1: 'Rayhan N. F.', player2: 'Rahmat Hidayat', seed: 8, club: 'PB Djarum' },
-  { id: 'p_9', name: 'Chico Wardoyo / Alwi Farhan', player1: 'Chico Wardoyo', player2: 'Alwi Farhan', seed: 9, club: 'PB Exist' },
-  { id: 'p_10', name: 'Christian Adinata / Yohanes Saut', player1: 'Christian Adinata', player2: 'Yohanes Saut', seed: 10, club: 'PB Tangkas' },
-  { id: 'p_11', name: 'Bobby Setiabudi / Teges Satriaji', player1: 'Bobby Setiabudi', player2: 'Teges Satriaji', seed: 11, club: 'PB Djarum' },
-  { id: 'p_12', name: 'Putra Erwiansyah / Patra Harapan', player1: 'Putra Erwiansyah', player2: 'Patra Harapan', seed: 12, club: 'PB Jaya Raya' },
-  { id: 'p_13', name: 'Raymond Indra / Nikolaus Joaquin', player1: 'Raymond Indra', player2: 'Nikolaus Joaquin', seed: 13, club: 'PB Djarum' },
-  { id: 'p_14', name: 'Anselmus Prasetya / Pulung Ramadhan', player1: 'Anselmus Prasetya', player2: 'Pulung Ramadhan', seed: 14, club: 'PB Djarum' },
-  { id: 'p_15', name: 'Adrian Pratama / Jonathan Farrell', player1: 'Adrian Pratama', player2: 'Jonathan Farrell', seed: 15, club: 'PB Jaya Raya' },
-  { id: 'p_16', name: 'Dexter Farrell / Wahyu Agung', player1: 'Dexter Farrell', player2: 'Wahyu Agung', seed: 16, club: 'PB Exist' },
-];
-
-const SAMPLE_16_PADEL: Participant[] = [
-  { id: 'p_1', name: 'Arturo Coello / Agustín Tapia', player1: 'Arturo Coello', player2: 'Agustín Tapia', seed: 1, club: 'Bali Padel Club' },
-  { id: 'p_2', name: 'Ale Galán / Juan Lebrón', player1: 'Ale Galán', player2: 'Juan Lebrón', seed: 2, club: 'Lombok Padel' },
-  { id: 'p_3', name: 'Franco Stupaczuk / Martin Di Nenno', player1: 'Franco Stupaczuk', player2: 'Martin Di Nenno', seed: 3, club: 'Canggu Arena' },
-  { id: 'p_4', name: 'Paquito Navarro / Sanyo Gutiérrez', player1: 'Paquito Navarro', player2: 'Sanyo Gutiérrez', seed: 4, club: 'Jakarta Smash' },
-  { id: 'p_5', name: 'Fede Chingotto / Javi Garrido', player1: 'Fede Chingotto', player2: 'Javi Garrido', seed: 5, club: 'Surabaya Padel' },
-  { id: 'p_6', name: 'Momo González / Alex Ruiz', player1: 'Momo González', player2: 'Alex Ruiz', seed: 6, club: 'Lombok Padel' },
-  { id: 'p_7', name: 'Coki Nieto / Jon Sanz', player1: 'Coki Nieto', player2: 'Jon Sanz', seed: 7, club: 'Bali Padel Club' },
-  { id: 'p_8', name: 'Maxi Sánchez / Lucho Capra', player1: 'Maxi Sánchez', player2: 'Lucho Capra', seed: 8, club: 'Seminyak Padel' },
-  { id: 'p_9', name: 'Lucas Campagnolo / Javi Leal', player1: 'Lucas Campagnolo', player2: 'Javi Leal', seed: 9, club: 'Jakarta Smash' },
-  { id: 'p_10', name: 'Gonzalo Rubio / Maxi Arce', player1: 'Gonzalo Rubio', player2: 'Maxi Arce', seed: 10, club: 'Bali Padel Club' },
-  { id: 'p_11', name: 'Ramiro Moyano / Xisco Gil', player1: 'Ramiro Moyano', player2: 'Xisco Gil', seed: 11, club: 'Bandung Padel' },
-  { id: 'p_12', name: 'Javier Barahona / Javi García', player1: 'Javier Barahona', player2: 'Javi García', seed: 12, club: 'Surabaya Padel' },
-  { id: 'p_13', name: 'Pincho Fernández / José Diestro', player1: 'Pincho Fernández', player2: 'José Diestro', seed: 13, club: 'Lombok Padel' },
-  { id: 'p_14', name: 'Tino Libaak / Leo Augsburger', player1: 'Tino Libaak', player2: 'Leo Augsburger', seed: 14, club: 'Bali Padel Club' },
-  { id: 'p_15', name: 'Pablo Cardona / Ivan Ramirez', player1: 'Pablo Cardona', player2: 'Ivan Ramirez', seed: 15, club: 'Jakarta Smash' },
-  { id: 'p_16', name: 'Edu Alonso / Alex Arroyo', player1: 'Edu Alonso', player2: 'Alex Arroyo', seed: 16, club: 'Seminyak Padel' },
-];
 
 export default function NewTournamentPage() {
   const router = useRouter();
@@ -92,60 +55,21 @@ export default function NewTournamentPage() {
   const [courtsText, setCourtsText] = useState('Court 1, Court 2, Court 3, Court 4');
 
   // Participants
-  const [participants, setParticipants] = useState<Participant[]>(SAMPLE_16_BADMINTON);
+  const [participants, setParticipants] = useState<Participant[]>([]);
 
-  // When format changes, adjust participant count
+  // When format changes, adjust participant count if they want to pre-fill?
+  // No, we let them empty it or they just wait for registration.
   const handleFormatChange = (newFormat: TournamentFormat) => {
     setFormat(newFormat);
-    if (newFormat === 'TWO_STAGE_PADEL_CUSTOM') {
-      setParticipants([]); // Start empty for registration workflow
-      setCourtsText('Court 1, Court 2, Court 3, Court 4');
-    } else if (newFormat === 'TWO_STAGE') {
-      setParticipants(sport === 'BADMINTON' ? SAMPLE_16_BADMINTON : SAMPLE_16_PADEL);
+    setParticipants([]); // start empty for real usage
+    if (newFormat === 'TWO_STAGE_PADEL_CUSTOM' || newFormat === 'TWO_STAGE') {
       setCourtsText('Court 1, Court 2, Court 3, Court 4');
     } else {
-      setParticipants(
-        (sport === 'BADMINTON' ? SAMPLE_16_BADMINTON : SAMPLE_16_PADEL).slice(0, 8)
-      );
       setCourtsText('Court 1, Court 2, Court 3');
     }
   };
 
-  const handleFillSample = () => {
-    if (format === 'TWO_STAGE') {
-      if (sport === 'BADMINTON') {
-        setName('Kejuaraan Ganda Badminton 4 Grup & Double Knockout 2026');
-        setVenue('GOR Djarum Arena');
-        setCity('Kudus');
-        setDescription(
-          'Format Dua Tahap: 16 Pasangan di 4 Grup Round Robin, dilanjutkan 2 Bagan Knockout (Upper Beginner & Beginner).'
-        );
-        setParticipants(SAMPLE_16_BADMINTON);
-      } else {
-        setName('Lombok Padel Two-Stage Championship 2026');
-        setVenue('Senggigi Padel Club');
-        setCity('Lombok Barat');
-        setDescription(
-          'Format Dua Tahap: 16 Pasangan di 4 Grup Round Robin, dilanjutkan 2 Bagan Knockout (Upper & Beginner).'
-        );
-        setParticipants(SAMPLE_16_PADEL);
-      }
-    } else {
-      if (sport === 'BADMINTON') {
-        setName('Surabaya Badminton Super Series 2026');
-        setVenue('GOR Kertajaya');
-        setCity('Surabaya');
-        setDescription('Kejuaraan bulutangkis antar klub se-Jawa Timur kategori ganda.');
-        setParticipants(SAMPLE_16_BADMINTON.slice(0, 8));
-      } else {
-        setName('Lombok Padel Open Trophy 2026');
-        setVenue('Senggigi Padel Club');
-        setCity('Lombok Barat');
-        setDescription('Turnamen padel invitasi nasional di pulau Lombok.');
-        setParticipants(SAMPLE_16_PADEL.slice(0, 8));
-      }
-    }
-  };
+
 
   const handleUpdateParticipant = (index: number, key: keyof Participant, value: any) => {
     const updated = [...participants];
@@ -275,14 +199,6 @@ export default function NewTournamentPage() {
           <ArrowLeft className="w-4 h-4" />
           Kembali ke Dashboard Admin
         </Link>
-        <button
-          type="button"
-          onClick={handleFillSample}
-          className="px-3.5 py-1.5 rounded-xl bg-lime-500/20 hover:bg-lime-500/30 border border-lime-500/40 text-lime-300 text-xs font-bold transition-colors flex items-center gap-1.5"
-        >
-          <Sparkles className="w-4 h-4" />
-          Isi Contoh Cepat ({sport} - {format === 'TWO_STAGE' ? '16 Pasangan' : '8 Pasangan'})
-        </button>
       </div>
 
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
@@ -453,9 +369,6 @@ export default function NewTournamentPage() {
                 onChange={(e) => {
                   const s = e.target.value as SportType;
                   setSport(s);
-                  if (format === 'TWO_STAGE') {
-                    setParticipants(s === 'BADMINTON' ? SAMPLE_16_BADMINTON : SAMPLE_16_PADEL);
-                  }
                 }}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-lime-400"
               >

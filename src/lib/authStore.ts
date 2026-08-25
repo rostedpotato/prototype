@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 
 const ADMIN_AUTH_KEY = 'racket_admin_authenticated';
-export const DEFAULT_ADMIN_PIN = 'admin123';
+
 
 export const AuthService = {
   isAdmin(): boolean {
@@ -15,8 +15,8 @@ export const AuthService = {
     }
   },
 
-  login(pin: string): boolean {
-    if (pin === DEFAULT_ADMIN_PIN || pin === 'admin') {
+  login(username: string, pin: string): boolean {
+    if (username === 'admin' && pin === 'password123') {
       try {
         localStorage.setItem(ADMIN_AUTH_KEY, 'true');
         window.dispatchEvent(new Event('auth_changed'));

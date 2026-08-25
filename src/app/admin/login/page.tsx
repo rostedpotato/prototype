@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAdminAuth, DEFAULT_ADMIN_PIN } from '@/lib/authStore';
+import { useAdminAuth } from '@/lib/authStore';
 import { Shield, KeyRound, Lock, ArrowRight, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const { isAdmin, isReady, login } = useAdminAuth();
-  const [pin, setPin] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -20,16 +21,11 @@ export default function AdminLoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (login(pin)) {
+    if (login(username, password)) {
       router.push('/admin');
     } else {
       setError(true);
     }
-  };
-
-  const handleQuickDemoLogin = () => {
-    login(DEFAULT_ADMIN_PIN);
-    router.push('/admin');
   };
 
   return (
@@ -48,22 +44,40 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        {/* PIN Form */}
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-xs font-bold text-slate-300 block mb-1.5 flex items-center gap-1.5">
+              Username
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setError(false);
+                }}
+                placeholder="Masukkan Username Admin"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-400"
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-300 block mb-1.5 flex items-center gap-1.5">
               <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-              PIN / Password Admin
+              Password
             </label>
             <div className="relative">
               <input
                 type="password"
-                value={pin}
+                value={password}
                 onChange={(e) => {
-                  setPin(e.target.value);
+                  setPassword(e.target.value);
                   setError(false);
                 }}
-                placeholder="Masukkan PIN Admin (default: admin123)"
+                placeholder="Masukkan Password Admin"
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-400"
                 required
               />
@@ -71,7 +85,7 @@ export default function AdminLoginPage() {
             </div>
             {error && (
               <p className="text-xs text-red-400 font-semibold mt-1.5">
-                PIN Admin salah. Gunakan default: <code>admin123</code>
+                Username atau Password salah.
               </p>
             )}
           </div>
@@ -84,19 +98,6 @@ export default function AdminLoginPage() {
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        {/* Quick Demo Access Helper */}
-        <div className="pt-4 border-t border-slate-800 space-y-2 text-center">
-          <p className="text-xs text-slate-400">Untuk uji coba langsung (Demo Review):</p>
-          <button
-            type="button"
-            onClick={handleQuickDemoLogin}
-            className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors flex items-center justify-center gap-2"
-          >
-            <CheckCircle2 className="w-4 h-4 text-lime-400" />
-            1-Klik Masuk sebagai Admin Demo
-          </button>
-        </div>
 
         <div className="text-center">
           <Link
