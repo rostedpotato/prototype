@@ -63,6 +63,7 @@ export function generateBracketMatches(
         currentSet: 1,
         court: courts[courtIndex] || `Court 1`,
         scheduledTime: `${13 + r * 2}:00 WIB`,
+        referee: `Wasit ${courtIndex + 1}`,
         status: 'UPCOMING',
         winnerId: null,
         nextMatchId: null,
@@ -127,7 +128,6 @@ export function generateGroupStageMatches(
   const groups = ['Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'];
   const participantsPerGroup = 4;
   
-  // Assign participants to groups based on seeding
   const groupedParticipants: Participant[] = [];
   const groupMaps: Record<string, Participant[]> = {
     'Grup 1': [],
@@ -136,23 +136,13 @@ export function generateGroupStageMatches(
     'Grup 4': [],
   };
 
-  // Distribute 16 participants into 4 groups using snake draft seeding
-  // Seed 1 -> Grup 1, Seed 2 -> Grup 2, Seed 3 -> Grup 3, Seed 4 -> Grup 4
-  // Seed 5 -> Grup 4, Seed 6 -> Grup 3, Seed 7 -> Grup 2, Seed 8 -> Grup 1
-  // etc.
-  const sortedParticipants = [...participants].sort((a, b) => (a.seed || 999) - (b.seed || 999));
+  // Shuffle participants randomly (no seeding for registered players)
+  const shuffled = [...participants].sort(() => Math.random() - 0.5);
   
-  for (let i = 0; i < sortedParticipants.length && i < 16; i++) {
-    const p = { ...sortedParticipants[i] };
-    let groupIndex: number;
-    
-    // Snake draft pattern for balanced groups
-    const seedPosition = i % 8;
-    if (seedPosition < 4) {
-      groupIndex = seedPosition;
-    } else {
-      groupIndex = 7 - seedPosition;
-    }
+  // Distribute into 4 groups of 4 (round-robin assignment)
+  for (let i = 0; i < shuffled.length && i < 16; i++) {
+    const p = { ...shuffled[i] };
+    const groupIndex = i % 4;
     
     p.group = groups[groupIndex];
     p.groupPoints = 0;
@@ -190,14 +180,11 @@ export function generateGroupStageMatches(
           matchOrder: matchOrder++,
           participant1: team1,
           participant2: team2,
-          scores: [
-            { setNumber: 1, score1: 0, score2: 0 },
-            { setNumber: 2, score1: 0, score2: 0 },
-            { setNumber: 3, score1: 0, score2: 0 },
-          ],
+          scores: Array.from({ length: 5 }, (_, i) => ({ setNumber: i + 1, score1: 0, score2: 0 })),
           currentSet: 1,
           court: courts[courtIndex] || `Court 1`,
           scheduledTime: '09:00 WIB',
+          referee: `Wasit ${courtIndex + 1}`,
           status: 'UPCOMING',
           winnerId: null,
           nextMatchId: null,
@@ -224,20 +211,36 @@ export function generateKnockoutStageFromGroups(
   groupedParticipants: Participant[],
   courts: string[] = ['Court 1', 'Court 2']
 ): { upperBracketMatches: Match[]; bottomBracketMatches: Match[] } {
-  // Sort each group by points, then wins to determine ranking
+  // Sort each group by points, set difference, point difference, then seed
   const groups = ['Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'];
   const rankedGroups: Record<string, Participant[]> = {};
   
   groups.forEach((groupName) => {
     const groupTeams = groupedParticipants.filter((p) => p.group === groupName);
-    // Sort by points (desc), then wins (desc), then by seed if tied
     const sorted = groupTeams.sort((a, b) => {
+      // 1. Points (PTS: +1 per win)
       if ((b.groupPoints || 0) !== (a.groupPoints || 0)) {
         return (b.groupPoints || 0) - (a.groupPoints || 0);
       }
-      if ((b.groupWins || 0) !== (a.groupWins || 0)) {
-        return (b.groupWins || 0) - (a.groupWins || 0);
+      // 2. Set Difference (SD)
+      const setDiffA = a.groupSetDiff ?? 0;
+      const setDiffB = b.groupSetDiff ?? 0;
+      if (setDiffB !== setDiffA) {
+        return setDiffB - setDiffA;
       }
+      // 3. Point Difference (PD)
+      const ptDiffA = a.groupPointDiff ?? 0;
+      const ptDiffB = b.groupPointDiff ?? 0;
+      if (ptDiffB !== ptDiffA) {
+        return ptDiffB - ptDiffA;
+      }
+      // 4. Points Won (PW)
+      const ptsWonA = a.groupPointsWon ?? 0;
+      const ptsWonB = b.groupPointsWon ?? 0;
+      if (ptsWonB !== ptsWonA) {
+        return ptsWonB - ptsWonA;
+      }
+      // 5. Seed
       return (a.seed || 999) - (b.seed || 999);
     });
     
@@ -317,14 +320,11 @@ export function generateKnockoutStageFromGroups(
         matchOrder: i + 1,
         participant1: p1,
         participant2: p2,
-        scores: [
-          { setNumber: 1, score1: 0, score2: 0 },
-          { setNumber: 2, score1: 0, score2: 0 },
-          { setNumber: 3, score1: 0, score2: 0 },
-        ],
+        scores: Array.from({ length: 5 }, (_, sIdx) => ({ setNumber: sIdx + 1, score1: 0, score2: 0 })),
         currentSet: 1,
         court: courts[courtIndex] || `Court 1`,
         scheduledTime: '14:00 WIB',
+        referee: `Wasit ${courtIndex + 1}`,
         status: 'UPCOMING',
         winnerId: null,
         nextMatchId: null,
@@ -351,14 +351,11 @@ export function generateKnockoutStageFromGroups(
         matchOrder: i + 5, // After QF
         participant1: null,
         participant2: null,
-        scores: [
-          { setNumber: 1, score1: 0, score2: 0 },
-          { setNumber: 2, score1: 0, score2: 0 },
-          { setNumber: 3, score1: 0, score2: 0 },
-        ],
+        scores: Array.from({ length: 7 }, (_, sIdx) => ({ setNumber: sIdx + 1, score1: 0, score2: 0 })),
         currentSet: 1,
         court: courts[courtIndex] || `Court 1`,
         scheduledTime: '16:00 WIB',
+        referee: `Wasit ${courtIndex + 1}`,
         status: 'UPCOMING',
         winnerId: null,
         nextMatchId: null,
@@ -375,18 +372,15 @@ export function generateKnockoutStageFromGroups(
       id: `${phase === 'KNOCKOUT_UPPER' ? 'upper' : 'bottom'}_final_${tournamentId}`,
       tournamentId,
       round: 3, // Final = round 3
-      roundName: phase === 'KNOCKOUT_UPPER' ? 'Final Upper Beginner' : 'Final Beginner',
+      roundName: phase === 'KNOCKOUT_UPPER' ? 'Final Bagan Atas' : 'Final Bagan Bawah',
       matchOrder: 7,
       participant1: null,
       participant2: null,
-      scores: [
-        { setNumber: 1, score1: 0, score2: 0 },
-        { setNumber: 2, score1: 0, score2: 0 },
-        { setNumber: 3, score1: 0, score2: 0 },
-      ],
+      scores: Array.from({ length: 11 }, (_, sIdx) => ({ setNumber: sIdx + 1, score1: 0, score2: 0 })),
       currentSet: 1,
       court: courts[0] || 'Court 1',
       scheduledTime: '18:00 WIB',
+      referee: 'Wasit 1',
       status: 'UPCOMING',
       winnerId: null,
       nextMatchId: null,

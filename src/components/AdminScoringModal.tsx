@@ -8,6 +8,9 @@ import {
   checkSetStatus,
   canIncrementScore,
   calculateMatchWinner,
+  getSetsToWinForRound,
+  getMaxSetsForRound,
+  getTargetGamesForMatch,
 } from '@/lib/scoreRules';
 import {
   X,
@@ -18,6 +21,7 @@ import {
   CircleDot,
   AlertTriangle,
   Users,
+  Sparkles,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -40,16 +44,18 @@ export default function AdminScoringModal({
   const { tournament } = useTournament(tournamentId);
   const { isAdmin } = useAdminAuth();
 
+  const setsToWin = getSetsToWinForRound(sport, tournament?.rules?.customPadelScoring, match?.roundName || '');
+  const maxSets = getMaxSetsForRound(sport, tournament?.rules?.customPadelScoring, match?.roundName || '');
+  const targetGames = getTargetGamesForMatch(sport, tournament?.rules?.customPadelScoring, match?.roundName || '');
+
   const [activeSet, setActiveSet] = useState<number>(1);
-  const [scores, setScores] = useState<SetScore[]>([
-    { setNumber: 1, score1: 0, score2: 0 },
-    { setNumber: 2, score1: 0, score2: 0 },
-    { setNumber: 3, score1: 0, score2: 0 },
-  ]);
+  const [scores, setScores] = useState<SetScore[]>([]);
   const [status, setStatus] = useState<MatchStatus>('LIVE');
   const [servingSide, setServingSide] = useState<1 | 2>(1);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [court, setCourt] = useState<string>('');
+  const [referee, setReferee] = useState<string>('');
+  const [scheduledTime, setScheduledTime] = useState<string>('');
   const [ruleNotice, setRuleNotice] = useState<string | null>(null);
 
   // Manual participant selector state
@@ -59,55 +65,40 @@ export default function AdminScoringModal({
   useEffect(() => {
     if (match) {
       setActiveSet(match.currentSet || 1);
-      setScores(
-        match.scores && match.scores.length === 3
-          ? JSON.parse(JSON.stringify(match.scores))
-          : [
-              { setNumber: 1, score1: 0, score2: 0 },
-              { setNumber: 2, score1: 0, score2: 0 },
-              { setNumber: 3, score1: 0, score2: 0 },
-            ]
-      );
+      const loadedScores: SetScore[] = match.scores && match.scores.length > 0 
+        ? JSON.parse(JSON.stringify(match.scores)) 
+        : [];
+      
+      while (loadedScores.length < maxSets) {
+        loadedScores.push({ setNumber: loadedScores.length + 1, score1: 0, score2: 0 });
+      }
+      setScores(loadedScores);
       setStatus(match.status);
       setServingSide(match.servingSide || 1);
       setWinnerId(match.winnerId || null);
       setCourt(match.court || 'Court 1');
+      setReferee(match.referee || '');
+      setScheduledTime(match.scheduledTime || '09:00 WIB');
       setP1Id(match.participant1?.id || '');
       setP2Id(match.participant2?.id || '');
       setRuleNotice(null);
     }
-  }, [match]);
+  }, [match, maxSets]);
 
   if (!isOpen || !match || !tournament || !isAdmin) return null;
 
-  let targetGames: number | undefined = undefined;
-  if (sport === 'PADEL' && tournament.rules.customPadelScoring) {
-    if (match.roundName === 'Final') {
-      targetGames = 6;
-    } else if (match.roundName === 'Semifinal') {
-      targetGames = 4;
-    } else {
-      targetGames = 3; // Best of 5 games (first to 3)
-    }
-  }
+  const modalCourtOptions = tournament.courts && tournament.courts.length > 0 ? tournament.courts : ['Court 1', 'Court 2', 'Court 3', 'Court 4'];
+  const modalRefereeOptions = modalCourtOptions.map((_, idx) => `Wasit ${idx + 1}`);
 
   const currentSetScore = scores[activeSet - 1] || { setNumber: activeSet, score1: 0, score2: 0 };
   const currentSetStatus = checkSetStatus(sport, currentSetScore.score1, currentSetScore.score2, targetGames);
-  const matchWinnerStatus = calculateMatchWinner(sport, scores, 2, targetGames);
+  const matchWinnerStatus = calculateMatchWinner(sport, scores, setsToWin, targetGames);
 
   const p1 = tournament.participants.find((p) => p.id === p1Id) || match.participant1;
   const p2 = tournament.participants.find((p) => p.id === p2Id) || match.participant2;
 
   const handleScoreChange = (team: 1 | 2, delta: number) => {
     setRuleNotice(null);
-
-    if (delta > 0) {
-      const check = canIncrementScore(sport, currentSetScore.score1, currentSetScore.score2, team, targetGames);
-      if (!check.allowed) {
-        setRuleNotice(check.reason || 'Poin tidak dapat ditambahkan.');
-        return;
-      }
-    }
 
     const newScores = scores.map((s) => {
       if (s.setNumber === activeSet) {
@@ -125,19 +116,37 @@ export default function AdminScoringModal({
     setScores(newScores);
 
     // Check if after this point change, the match is won!
-    const winCheck = calculateMatchWinner(sport, newScores, 2);
+    const winCheck = calculateMatchWinner(sport, newScores, setsToWin, targetGames);
     if (winCheck.isMatchOver && winCheck.winnerSide) {
       const winningParticipant = winCheck.winnerSide === 1 ? p1 : p2;
       if (winningParticipant) {
         setWinnerId(winningParticipant.id);
         setStatus('FINISHED');
       }
-    } else {
-      // Check if current set was just won, prompt to move to next set
-      const updatedSetScore = newScores[activeSet - 1];
-      const updatedSetStatus = checkSetStatus(sport, updatedSetScore.score1, updatedSetScore.score2);
-      if (updatedSetStatus.isFinished && activeSet < 3) {
-        setRuleNotice(`Set ${activeSet} selesai! Klik Set ${activeSet + 1} untuk melanjutkan.`);
+    }
+  };
+
+  const handleDirectScoreSet = (score1Val: number, score2Val: number) => {
+    setRuleNotice(null);
+    const newScores = scores.map((s) => {
+      if (s.setNumber === activeSet) {
+        return {
+          ...s,
+          score1: Math.max(0, score1Val),
+          score2: Math.max(0, score2Val),
+        };
+      }
+      return s;
+    });
+
+    setScores(newScores);
+
+    const winCheck = calculateMatchWinner(sport, newScores, setsToWin, targetGames);
+    if (winCheck.isMatchOver && winCheck.winnerSide) {
+      const winningParticipant = winCheck.winnerSide === 1 ? p1 : p2;
+      if (winningParticipant) {
+        setWinnerId(winningParticipant.id);
+        setStatus('FINISHED');
       }
     }
   };
@@ -150,6 +159,7 @@ export default function AdminScoringModal({
       else if (matchWinnerStatus.winnerSide === 2 && p2) finalWinnerId = p2.id;
     }
 
+    // Filter to active sets (or at least preserve sets played)
     TournamentService.updateMatch(tournamentId, match.id, {
       scores,
       currentSet: activeSet,
@@ -157,6 +167,8 @@ export default function AdminScoringModal({
       status,
       winnerId: status === 'FINISHED' ? finalWinnerId : null,
       court,
+      referee,
+      scheduledTime,
       participant1: p1 || null,
       participant2: p2 || null,
     });
@@ -174,8 +186,8 @@ export default function AdminScoringModal({
     onClose();
   };
 
-  const canIncTeam1 = canIncrementScore(sport, currentSetScore.score1, currentSetScore.score2, 1).allowed;
-  const canIncTeam2 = canIncrementScore(sport, currentSetScore.score1, currentSetScore.score2, 2).allowed;
+  const canIncTeam1 = canIncrementScore(sport, currentSetScore.score1, currentSetScore.score2, 1, targetGames).allowed;
+  const canIncTeam2 = canIncrementScore(sport, currentSetScore.score1, currentSetScore.score2, 2, targetGames).allowed;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
@@ -205,14 +217,69 @@ export default function AdminScoringModal({
 
         {/* Scrollable Content */}
         <div className="p-5 overflow-y-auto space-y-4">
-          {/* Status Alert Banner if match/set finished */}
+          {/* Live Sets & Points Summary Banner */}
+          <div className="p-4 bg-gradient-to-br from-blue-950/60 via-slate-900 to-indigo-950/60 border border-blue-800/50 rounded-2xl space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center justify-center text-xs font-black">
+                  🎾
+                </span>
+                <div>
+                  <span className="text-xs font-black text-white">
+                    {match.roundName}
+                  </span>
+                  <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                    Target: Menang {setsToWin} Set
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 flex-wrap">
+                <span>Wasit: <strong className="text-amber-300">{referee || 'Belum dipilih'}</strong></span>
+                <span>•</span>
+                <span>Jadwal: <strong className="text-cyan-300">{scheduledTime || 'Belum diatur'}</strong></span>
+              </div>
+            </div>
+
+            {/* Scoreboard Tally */}
+            <div className="grid grid-cols-2 gap-3 items-center">
+              <div className={`p-3 rounded-xl border text-center transition-all ${
+                matchWinnerStatus.setsWon1 > matchWinnerStatus.setsWon2
+                  ? 'bg-blue-500/10 border-blue-500/40 text-blue-200'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-300'
+              }`}>
+                <p className="text-xs font-black truncate">{p1?.name || 'Peserta 1'}</p>
+                <div className="text-2xl font-black font-score text-white mt-0.5">
+                  {matchWinnerStatus.setsWon1} <span className="text-xs font-medium text-slate-400">Set</span>
+                </div>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                  Total Poin: <strong className="text-lime-400">{matchWinnerStatus.pointsWon1}</strong>
+                </p>
+              </div>
+
+              <div className={`p-3 rounded-xl border text-center transition-all ${
+                matchWinnerStatus.setsWon2 > matchWinnerStatus.setsWon1
+                  ? 'bg-blue-500/10 border-blue-500/40 text-blue-200'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-300'
+              }`}>
+                <p className="text-xs font-black truncate">{p2?.name || 'Peserta 2'}</p>
+                <div className="text-2xl font-black font-score text-white mt-0.5">
+                  {matchWinnerStatus.setsWon2} <span className="text-xs font-medium text-slate-400">Set</span>
+                </div>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                  Total Poin: <strong className="text-lime-400">{matchWinnerStatus.pointsWon2}</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Status Alert Banner if match finished */}
           {matchWinnerStatus.isMatchOver && (
             <div className="p-3.5 bg-gradient-to-r from-amber-500/20 to-lime-500/20 border border-amber-400/40 rounded-2xl flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <Trophy className="w-5 h-5 text-amber-400 flex-shrink-0" />
                 <div>
                   <p className="text-xs font-black text-white">
-                    PERTANDINGAN SELESAI (2 SET MENANG)
+                    PERTANDINGAN MEMENUHI SYARAT KEMENANGAN ({setsToWin} SET MENANG)
                   </p>
                   <p className="text-xs text-amber-300 font-bold">
                     Pemenang:{' '}
@@ -221,25 +288,17 @@ export default function AdminScoringModal({
                 </div>
               </div>
               <span className="text-[11px] font-extrabold px-2.5 py-1 rounded-lg bg-lime-500 text-slate-950">
-                Auto-Advancing
+                Selesai
               </span>
             </div>
           )}
 
-          {/* Rule Notice / Warning Banner */}
-          {ruleNotice && (
-            <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl flex items-center gap-2 text-xs font-semibold text-amber-200 animate-in fade-in">
-              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-              <span>{ruleNotice}</span>
-            </div>
-          )}
-
-          {/* Participant Override / Assignment (Essential if slot is waiting or needs manual fix) */}
+          {/* Participant Override / Assignment */}
           <div className="p-3 bg-slate-950/60 rounded-2xl border border-slate-800 space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-lime-400" />
-                Peserta di Pertandingan Ini (Bisa dipilih jika belum terisi dari bagan):
+                Peserta Pertandingan:
               </label>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -277,8 +336,8 @@ export default function AdminScoringModal({
             </div>
           </div>
 
-          {/* Status & Court Selector */}
-          <div className="grid grid-cols-2 gap-3 bg-slate-950/40 p-3 rounded-2xl border border-slate-800">
+          {/* Status, Court, Referee & Scheduled Time Selector */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-950/40 p-3.5 rounded-2xl border border-slate-800">
             <div>
               <label className="text-xs font-bold text-slate-400 block mb-1">
                 Status Pertandingan
@@ -304,51 +363,89 @@ export default function AdminScoringModal({
               <label className="text-xs font-bold text-slate-400 block mb-1">
                 Lapangan (Court)
               </label>
-              <input
-                type="text"
+              <select
                 value={court}
                 onChange={(e) => setCourt(e.target.value)}
-                placeholder="e.g. Court 1"
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-lime-500"
+              >
+                {modalCourtOptions.map((c) => (
+                  <option key={c} value={c}>
+                    🏟️ {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-400 block mb-1">
+                Wasit (Referee)
+              </label>
+              <select
+                value={referee}
+                onChange={(e) => setReferee(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-amber-300 focus:outline-none focus:border-amber-500"
+              >
+                <option value="">- Tanpa Wasit -</option>
+                {modalRefereeOptions.map((r) => (
+                  <option key={r} value={r}>
+                    🧑‍⚖️ {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-400 block mb-1">
+                Waktu / Jam Tanding
+              </label>
+              <input
+                type="text"
+                value={scheduledTime}
+                onChange={(e) => setScheduledTime(e.target.value)}
+                placeholder="misal: 09:00 WIB"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-cyan-300 focus:outline-none focus:border-cyan-400"
               />
             </div>
           </div>
 
           {/* Set Selector Tabs */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-300">
-                Pilih Set:
+                Pilih Set untuk Diinput / Diedit:
               </label>
               <span className="text-[11px] font-bold text-lime-400">
                 {currentSetStatus.statusLabel}
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              {[1, 2, 3].map((setNum) => {
-                const s = scores[setNum - 1];
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {Array.from({ length: maxSets }, (_, i) => i + 1).map((setNum) => {
+                const s = scores[setNum - 1] || { setNumber: setNum, score1: 0, score2: 0 };
                 const isActive = activeSet === setNum;
-                const setSt = checkSetStatus(sport, s.score1, s.score2);
+                const isSetWon1 = s.score1 > s.score2 && (s.score1 > 0 || s.score2 > 0);
+                const isSetWon2 = s.score2 > s.score1 && (s.score1 > 0 || s.score2 > 0);
 
                 return (
                   <button
                     key={setNum}
                     type="button"
                     onClick={() => setActiveSet(setNum)}
-                    className={`py-2 px-3 rounded-2xl border text-center font-bold transition-all relative ${
+                    className={`flex-1 min-w-[72px] py-2 px-2.5 rounded-2xl border text-center font-bold transition-all relative ${
                       isActive
                         ? 'bg-lime-500/20 border-lime-400 text-lime-300 shadow-md ring-1 ring-lime-400/40'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                        : isSetWon1 || isSetWon2
+                        ? 'bg-slate-900 border-slate-700 text-slate-200'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:border-slate-700'
                     }`}
                   >
-                    <div className="text-xs flex items-center justify-center gap-1">
+                    <div className="text-[10px] flex items-center justify-center gap-1">
                       <span>SET {setNum}</span>
-                      {setSt.isFinished && (
+                      {(isSetWon1 || isSetWon2) && (
                         <CheckCircle2 className="w-3 h-3 text-emerald-400 inline" />
                       )}
                     </div>
-                    <div className="text-base font-score font-extrabold mt-0.5">
+                    <div className="text-sm font-score font-extrabold mt-0.5">
                       {s.score1} - {s.score2}
                     </div>
                   </button>
@@ -357,100 +454,194 @@ export default function AdminScoringModal({
             </div>
           </div>
 
-          {/* Live Touch Scorepad */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            {/* Team 1 Box */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-3xl p-4 flex flex-col items-center text-center">
-              <div className="w-full mb-2">
-                <span className="text-xs font-black text-slate-100 line-clamp-1">
-                  {p1?.name || 'Peserta 1'}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setServingSide(1)}
-                  className={`mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 mx-auto transition-colors ${
-                    servingSide === 1
-                      ? 'bg-lime-500 text-slate-950 shadow-sm shadow-lime-500/50'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  <CircleDot className="w-2.5 h-2.5" />
-                  {servingSide === 1 ? 'Servis' : 'Set Servis'}
-                </button>
+          {/* Live Touch Scorepad for Active Set */}
+          <div className="bg-slate-950/60 p-4 rounded-3xl border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                Input Skor Set {activeSet}
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Poin/Game yang didapat di Set {activeSet}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              {/* Team 1 Box */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex flex-col items-center text-center">
+                <div className="w-full mb-1.5">
+                  <span className="text-xs font-black text-slate-100 line-clamp-1">
+                    {p1?.name || 'Peserta 1'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setServingSide(1)}
+                    className={`mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 mx-auto transition-colors ${
+                      servingSide === 1
+                        ? 'bg-lime-500 text-slate-950 shadow-sm shadow-lime-500/50'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                  >
+                    <CircleDot className="w-2.5 h-2.5" />
+                    {servingSide === 1 ? 'Servis' : 'Set Servis'}
+                  </button>
+                </div>
+
+                {/* Score Stepper & Direct Input */}
+                <div className="flex items-center gap-2 my-1">
+                  <button
+                    type="button"
+                    onClick={() => handleScoreChange(1, -1)}
+                    disabled={currentSetScore.score1 === 0}
+                    className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 disabled:opacity-30 border border-slate-700 flex items-center justify-center active:scale-95 transition-all text-lg font-bold"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+
+                  <input
+                    type="number"
+                    min="0"
+                    value={currentSetScore.score1}
+                    onChange={(e) => handleDirectScoreSet(parseInt(e.target.value) || 0, currentSetScore.score2)}
+                    className="w-16 h-14 rounded-2xl bg-slate-950 border-2 border-slate-700 text-center text-3xl font-black font-score text-white focus:outline-none focus:border-lime-400 shadow-inner"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => handleScoreChange(1, 1)}
+                    className="w-9 h-9 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-md shadow-lime-500/20 active:scale-95 transition-all"
+                  >
+                    <Plus className="w-4 h-4 stroke-[3]" />
+                  </button>
+                </div>
               </div>
 
-              {/* Score Display */}
-              <div className="w-20 h-20 sm:w-24 sm:h-24 my-1 rounded-2xl bg-slate-900 border-2 border-slate-700 flex items-center justify-center text-4xl sm:text-5xl font-black font-score text-white shadow-inner">
-                {currentSetScore.score1}
-              </div>
+              {/* Team 2 Box */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex flex-col items-center text-center">
+                <div className="w-full mb-1.5">
+                  <span className="text-xs font-black text-slate-100 line-clamp-1">
+                    {p2?.name || 'Peserta 2'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setServingSide(2)}
+                    className={`mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 mx-auto transition-colors ${
+                      servingSide === 2
+                        ? 'bg-lime-500 text-slate-950 shadow-sm shadow-lime-500/50'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                  >
+                    <CircleDot className="w-2.5 h-2.5" />
+                    {servingSide === 2 ? 'Servis' : 'Set Servis'}
+                  </button>
+                </div>
 
-              {/* Steppers */}
-              <div className="flex items-center gap-2 mt-2 w-full justify-center">
-                <button
-                  type="button"
-                  onClick={() => handleScoreChange(1, -1)}
-                  disabled={currentSetScore.score1 === 0}
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 disabled:opacity-30 border border-slate-700 flex items-center justify-center active:scale-95 transition-all text-xl font-bold"
-                >
-                  <Minus className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleScoreChange(1, 1)}
-                  disabled={!canIncTeam1}
-                  className="flex-1 h-10 sm:h-12 rounded-xl bg-lime-500 hover:bg-lime-400 disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none text-slate-950 flex items-center justify-center font-black text-xl shadow-lg shadow-lime-500/20 active:scale-95 transition-all gap-1"
-                >
-                  <Plus className="w-5 h-5 stroke-[3]" />
-                  <span>+1</span>
-                </button>
+                {/* Score Stepper & Direct Input */}
+                <div className="flex items-center gap-2 my-1">
+                  <button
+                    type="button"
+                    onClick={() => handleScoreChange(2, -1)}
+                    disabled={currentSetScore.score2 === 0}
+                    className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 disabled:opacity-30 border border-slate-700 flex items-center justify-center active:scale-95 transition-all text-lg font-bold"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+
+                  <input
+                    type="number"
+                    min="0"
+                    value={currentSetScore.score2}
+                    onChange={(e) => handleDirectScoreSet(currentSetScore.score1, parseInt(e.target.value) || 0)}
+                    className="w-16 h-14 rounded-2xl bg-slate-950 border-2 border-slate-700 text-center text-3xl font-black font-score text-white focus:outline-none focus:border-lime-400 shadow-inner"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => handleScoreChange(2, 1)}
+                    className="w-9 h-9 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-md shadow-lime-500/20 active:scale-95 transition-all"
+                  >
+                    <Plus className="w-4 h-4 stroke-[3]" />
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Team 2 Box */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-3xl p-4 flex flex-col items-center text-center">
-              <div className="w-full mb-2">
-                <span className="text-xs font-black text-slate-100 line-clamp-1">
-                  {p2?.name || 'Peserta 2'}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setServingSide(2)}
-                  className={`mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 mx-auto transition-colors ${
-                    servingSide === 2
-                      ? 'bg-lime-500 text-slate-950 shadow-sm shadow-lime-500/50'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  <CircleDot className="w-2.5 h-2.5" />
-                  {servingSide === 2 ? 'Servis' : 'Set Servis'}
-                </button>
+            {/* Quick Set Presets for Wasit/Admin */}
+            <div className="pt-2 border-t border-slate-800/80">
+              <span className="text-[10px] font-bold text-slate-400 block mb-1.5">
+                ⚡ Tombol Cepat Skor Set {activeSet}:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  [6, 0], [6, 1], [6, 2], [6, 3], [6, 4], [7, 5], [7, 6],
+                  [0, 6], [1, 6], [2, 6], [3, 6], [4, 6], [5, 7], [6, 7]
+                ].map(([s1, s2]) => (
+                  <button
+                    key={`${s1}-${s2}`}
+                    type="button"
+                    onClick={() => handleDirectScoreSet(s1, s2)}
+                    className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] font-bold text-slate-200 active:scale-95 transition-all"
+                  >
+                    {s1} - {s2}
+                  </button>
+                ))}
               </div>
+            </div>
+          </div>
 
-              {/* Score Display */}
-              <div className="w-20 h-20 sm:w-24 sm:h-24 my-1 rounded-2xl bg-slate-900 border-2 border-slate-700 flex items-center justify-center text-4xl sm:text-5xl font-black font-score text-white shadow-inner">
-                {currentSetScore.score2}
-              </div>
+          {/* Set-by-Set Overview Matrix Breakdown */}
+          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl overflow-hidden">
+            <div className="px-4 py-2.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+              <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                📋 Ringkasan Per Set (Menentukan Klasemen Grup)
+              </span>
+              <span className="text-[10px] text-slate-400">
+                Poin per set dihitung untuk tiebreaker
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 font-bold">
+                    <th className="py-2 px-3">SET</th>
+                    <th className="py-2 px-3">{p1?.name || 'Peserta 1'}</th>
+                    <th className="py-2 px-3">{p2?.name || 'Peserta 2'}</th>
+                    <th className="py-2 px-3 text-right">HASIL SET</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-medium">
+                  {scores.slice(0, maxSets).map((s) => {
+                    const hasScore = s.score1 > 0 || s.score2 > 0;
+                    const isWon1 = s.score1 > s.score2 && hasScore;
+                    const isWon2 = s.score2 > s.score1 && hasScore;
 
-              {/* Steppers */}
-              <div className="flex items-center gap-2 mt-2 w-full justify-center">
-                <button
-                  type="button"
-                  onClick={() => handleScoreChange(2, -1)}
-                  disabled={currentSetScore.score2 === 0}
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 disabled:opacity-30 border border-slate-700 flex items-center justify-center active:scale-95 transition-all text-xl font-bold"
-                >
-                  <Minus className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleScoreChange(2, 1)}
-                  disabled={!canIncTeam2}
-                  className="flex-1 h-10 sm:h-12 rounded-xl bg-lime-500 hover:bg-lime-400 disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none text-slate-950 flex items-center justify-center font-black text-xl shadow-lg shadow-lime-500/20 active:scale-95 transition-all gap-1"
-                >
-                  <Plus className="w-5 h-5 stroke-[3]" />
-                  <span>+1</span>
-                </button>
-              </div>
+                    return (
+                      <tr key={s.setNumber} className={activeSet === s.setNumber ? 'bg-blue-500/10' : ''}>
+                        <td className="py-2 px-3 font-bold text-slate-300">Set {s.setNumber}</td>
+                        <td className="py-2 px-3 font-bold text-white font-score">{s.score1}</td>
+                        <td className="py-2 px-3 font-bold text-white font-score">{s.score2}</td>
+                        <td className="py-2 px-3 text-right">
+                          {isWon1 ? (
+                            <span className="text-blue-400 font-bold">✅ Menang {p1?.name?.slice(0, 10) || 'P1'}</span>
+                          ) : isWon2 ? (
+                            <span className="text-emerald-400 font-bold">✅ Menang {p2?.name?.slice(0, 10) || 'P2'}</span>
+                          ) : (
+                            <span className="text-slate-500">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-slate-900 font-black text-lime-400 border-t border-slate-700">
+                    <td className="py-2 px-3">TOTAL</td>
+                    <td className="py-2 px-3 font-score text-sm">{matchWinnerStatus.pointsWon1} Poin ({matchWinnerStatus.setsWon1} Set)</td>
+                    <td className="py-2 px-3 font-score text-sm">{matchWinnerStatus.pointsWon2} Poin ({matchWinnerStatus.setsWon2} Set)</td>
+                    <td className="py-2 px-3 text-right text-xs">
+                      Selisih: {matchWinnerStatus.pointsWon1 - matchWinnerStatus.pointsWon2 > 0 ? `+${matchWinnerStatus.pointsWon1 - matchWinnerStatus.pointsWon2}` : matchWinnerStatus.pointsWon1 - matchWinnerStatus.pointsWon2} Poin
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 

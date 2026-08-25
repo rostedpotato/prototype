@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Users,
   Layers,
+  Calendar,
 } from 'lucide-react';
 
 interface GroupStageViewerProps {
@@ -57,13 +58,13 @@ export default function GroupStageViewer({
               Sistem Turnamen Dua Tahap (Two-Stage Tournament)
             </div>
             <h3 className="text-xl font-black text-white">
-              Fase 1: Round Robin (4 Grup) ➔ Fase 2: Double Knockout Brackets
+              Fase 1: Round Robin (4 Grup) ➔ Fase 2: 2 Bagan Knockout (Mulai dari QF)
             </h3>
             <p className="text-xs text-slate-400 mt-1 max-w-2xl">
               16 Pasangan bertanding di 4 grup. 2 Peringkat teratas (Top 2) lolos ke{' '}
-              <strong className="text-blue-400">Bagan Upper Beginner</strong>, dan 2 peringkat
-              terbawah (Bottom 2) lolos ke{' '}
-              <strong className="text-emerald-400">Bagan Beginner</strong>.
+              <strong className="text-blue-400">Bagan Atas (Upper Bracket)</strong>, dan 2 peringkat
+              terbawah (Peringkat 3 & 4) lolos ke{' '}
+              <strong className="text-emerald-400">Bagan Bawah (Bottom Bracket)</strong>.
             </p>
           </div>
 
@@ -73,17 +74,28 @@ export default function GroupStageViewer({
               {tournament.groupStageCompleted ? (
                 <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-black">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>2 Bagan Knockout Sudah Aktif</span>
+                  <span>2 Bagan Knockout Sudah Aktif (Mulai dari QF)</span>
                 </div>
               ) : (
-                <button
-                  onClick={handleGenerateKnockout}
-                  disabled={isGenerating}
-                  className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-blue-500/25 transition-all flex items-center gap-2 animate-pulse hover:animate-none"
-                >
-                  <Layers className="w-4 h-4" />
-                  <span>Kunci Klasemen & Buat 2 Bagan Knockout</span>
-                </button>
+                <div className="space-y-1.5 text-right">
+                  <button
+                    onClick={handleGenerateKnockout}
+                    disabled={isGenerating}
+                    className={`px-5 py-3 rounded-2xl text-white font-black text-xs shadow-lg transition-all flex items-center gap-2 ${
+                      groupMatches.length > 0 && groupMatches.every((m) => m.status === 'FINISHED')
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/30 ring-2 ring-emerald-400 animate-pulse'
+                        : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 shadow-blue-500/25'
+                    }`}
+                  >
+                    <Layers className="w-4 h-4" />
+                    <span>Kunci Klasemen & Buat 2 Bagan Knockout</span>
+                  </button>
+                  {groupMatches.length > 0 && groupMatches.every((m) => m.status === 'FINISHED') && (
+                    <p className="text-[11px] text-emerald-400 font-bold">
+                      ✅ Semua 24 match grup selesai! Siap dibuat bagan.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -98,29 +110,29 @@ export default function GroupStageViewer({
             </div>
             <p className="text-sm font-black text-white">Round Robin Antar Tim</p>
             <p className="text-[11px] text-slate-400 mt-1">
-              Masing-masing tim bermain 3 kali untuk menentukan peringkat grup.
+              Total 24 pertandingan. Masing-masing tim bermain 3 kali untuk menentukan peringkat grup.
             </p>
           </div>
 
           <div className="p-4 rounded-2xl bg-blue-950/30 border border-blue-800/40">
             <div className="flex items-center gap-2 text-xs font-bold text-blue-400 mb-1">
               <Trophy className="w-4 h-4 text-blue-400" />
-              Lolos ke Bagan Upper (8 Tim)
+              🏆 Bagan Atas / Upper (8 Tim)
             </div>
-            <p className="text-sm font-black text-blue-200">Top 2 dari Setiap Grup</p>
+            <p className="text-sm font-black text-blue-200">Top 2 dari Setiap Grup (1A, 2A, 1B, 2B, 1C, 2C, 1D, 2D)</p>
             <p className="text-[11px] text-blue-300/70 mt-1">
-              Peringkat 1 & 2 (1A, 2A, 1B, 2B, 1C, 2C, 1D, 2D) memperebutkan Juara Upper.
+              Mulai dari QF ➔ SF ➔ Final (Memperebutkan Juara 1 Bagan Atas).
             </p>
           </div>
 
           <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-800/40">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 mb-1">
               <Medal className="w-4 h-4 text-emerald-400" />
-              Lolos ke Bagan Beginner (8 Tim)
+              🏅 Bagan Bawah / Bottom (8 Tim)
             </div>
-            <p className="text-sm font-black text-emerald-200">Bottom 2 dari Setiap Grup</p>
+            <p className="text-sm font-black text-emerald-200">Peringkat 3 & 4 (3A, 4A, 3B, 4B, 3C, 4C, 3D, 4D)</p>
             <p className="text-[11px] text-emerald-300/70 mt-1">
-              Peringkat 3 & 4 (3A, 4A, 3B, 4B, 3C, 4C, 3D, 4D) memperebutkan Juara Beginner.
+              Mulai dari QF ➔ SF ➔ Final (Memperebutkan Juara 1 Bagan Bawah).
             </p>
           </div>
         </div>
@@ -135,117 +147,138 @@ export default function GroupStageViewer({
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {groups.map((groupName, gIdx) => {
-            const groupParticipants = tournament.participants.filter(
+            const rawParticipants = tournament.participants.filter(
               (p) => p.group === groupName
             );
 
-            // Group colors styling
+            const groupMatches = tournament.matches.filter(
+              (m) => m.phase === 'GROUP' && (m.groupName === groupName || m.roundName?.includes(groupName))
+            );
+
+            const sortedStandings = rawParticipants
+              .map((p) => {
+                const finishedMatches = groupMatches.filter(
+                  (m) =>
+                    (m.participant1?.id === p.id || m.participant2?.id === p.id) &&
+                    m.status === 'FINISHED'
+                );
+
+                let wins = 0;
+                let losses = 0;
+                let setsWon = 0;
+                let setsLost = 0;
+                let pointsWon = 0;
+                let pointsLost = 0;
+
+                finishedMatches.forEach((m) => {
+                  if (m.winnerId === p.id) {
+                    wins += 1;
+                  } else if (m.winnerId) {
+                    losses += 1;
+                  }
+
+                  m.scores.forEach((s) => {
+                    const isP1 = m.participant1?.id === p.id;
+                    const myScore = isP1 ? s.score1 : s.score2;
+                    const oppScore = isP1 ? s.score2 : s.score1;
+
+                    if (myScore > 0 || oppScore > 0) {
+                      pointsWon += myScore;
+                      pointsLost += oppScore;
+                      if (myScore > oppScore) setsWon += 1;
+                      else if (oppScore > myScore) setsLost += 1;
+                    }
+                  });
+                });
+
+                const points = wins * 1;
+                const setDiff = setsWon - setsLost;
+                const pointDiff = pointsWon - pointsLost;
+
+                return {
+                  ...p,
+                  played: finishedMatches.length,
+                  groupWins: wins,
+                  groupLosses: losses,
+                  groupPoints: points,
+                  setsWon,
+                  setsLost,
+                  setDiff,
+                  pointsWon,
+                  pointsLost,
+                  pointDiff,
+                };
+              })
+              .sort((a, b) => {
+                if (b.groupPoints !== a.groupPoints) return b.groupPoints - a.groupPoints;
+                if (b.setDiff !== a.setDiff) return b.setDiff - a.setDiff;
+                if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
+                if (b.pointsWon !== a.pointsWon) return b.pointsWon - a.pointsWon;
+                return (a.seed || 999) - (b.seed || 999);
+              });
+
             const colorThemes = [
-              { header: 'from-blue-600/30 to-blue-900/20', border: 'border-blue-500/30', text: 'text-blue-400' },
-              { header: 'from-emerald-600/30 to-emerald-900/20', border: 'border-emerald-500/30', text: 'text-emerald-400' },
-              { header: 'from-amber-600/30 to-amber-900/20', border: 'border-amber-500/30', text: 'text-amber-400' },
-              { header: 'from-rose-600/30 to-rose-900/20', border: 'border-rose-500/30', text: 'text-rose-400' },
+              { header: 'from-blue-600/30 to-blue-900/20' },
+              { header: 'from-emerald-600/30 to-emerald-900/20' },
+              { header: 'from-amber-600/30 to-amber-900/20' },
+              { header: 'from-rose-600/30 to-rose-900/20' },
             ];
             const theme = colorThemes[gIdx % colorThemes.length];
 
             return (
-              <div
-                key={groupName}
-                className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg"
-              >
-                {/* Group Header */}
-                <div
-                  className={`px-5 py-3.5 bg-gradient-to-r ${theme.header} border-b border-slate-800 flex items-center justify-between`}
-                >
+              <div key={groupName} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+                <div className={`px-5 py-3.5 bg-gradient-to-r ${theme.header} border-b border-slate-800 flex items-center justify-between`}>
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-lg bg-slate-950/80 border border-slate-700 flex items-center justify-center font-black text-xs text-white">
-                      {gIdx + 1}
-                    </span>
-                    <h4 className="text-sm font-black text-white uppercase tracking-wider">
-                      {groupName}
-                    </h4>
+                    <span className="w-6 h-6 rounded-lg bg-slate-950/80 border border-slate-700 flex items-center justify-center font-black text-xs text-white">{gIdx + 1}</span>
+                    <h4 className="text-sm font-black text-white uppercase tracking-wider">{groupName}</h4>
                   </div>
-                  <span className="text-[11px] font-bold text-slate-400">4 Pasangan</span>
+                  <span className="text-[11px] font-bold text-slate-400">4 Pasangan (Best of 5)</span>
                 </div>
 
-                {/* Standings Table */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="bg-slate-950/60 text-slate-400 border-b border-slate-800 font-black">
-                        <th className="py-2.5 px-3 text-center w-10">POS</th>
+                        <th className="py-2.5 px-3 text-center w-8">POS</th>
                         <th className="py-2.5 px-3">PASANGAN / TIM</th>
-                        <th className="py-2.5 px-2 text-center w-10">M</th>
-                        <th className="py-2.5 px-2 text-center w-10">W</th>
-                        <th className="py-2.5 px-2 text-center w-10">L</th>
-                        <th className="py-2.5 px-3 text-center w-12 text-lime-400">PTS</th>
+                        <th className="py-2.5 px-1.5 text-center w-8">M</th>
+                        <th className="py-2.5 px-1.5 text-center w-8 text-emerald-400">W</th>
+                        <th className="py-2.5 px-1.5 text-center w-8 text-rose-400">L</th>
+                        <th className="py-2.5 px-2 text-center">SET (±)</th>
+                        <th className="py-2.5 px-2 text-center">POIN (±)</th>
+                        <th className="py-2.5 px-2.5 text-center text-lime-400 font-extrabold">PTS</th>
                         <th className="py-2.5 px-3 text-right">STATUS</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-medium">
-                      {groupParticipants.map((p, pIdx) => {
-                        const rank = p.groupRank || pIdx + 1;
+                      {sortedStandings.map((p, pIdx) => {
+                        const rank = pIdx + 1;
                         const isTop2 = rank <= 2;
-                        const played = (p.groupWins || 0) + (p.groupLosses || 0);
-
                         return (
-                          <tr
-                            key={p.id}
-                            className={`transition-colors ${
-                              isTop2
-                                ? 'bg-blue-500/5 hover:bg-blue-500/10'
-                                : 'bg-slate-950/30 hover:bg-slate-800/40'
-                            }`}
-                          >
+                          <tr key={p.id} className="bg-slate-950/30 hover:bg-slate-800/40">
                             <td className="py-3 px-3 text-center font-black">
-                              <span
-                                className={`w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] ${
-                                  rank === 1
-                                    ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
-                                    : rank === 2
-                                    ? 'bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40'
-                                    : 'text-slate-400'
-                                }`}
-                              >
-                                {rank}
-                              </span>
+                              <span className={`w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] ${rank <= 2 ? 'bg-blue-500/20 text-blue-300' : 'text-slate-400'}`}>{rank}</span>
                             </td>
                             <td className="py-3 px-3">
                               <div className="font-bold text-white flex items-center gap-1.5">
-                                <span className="truncate max-w-[150px] sm:max-w-[180px]">
-                                  {p.name}
-                                </span>
-                                {p.seed && (
-                                  <span className="text-[9px] font-black px-1 rounded bg-amber-400/10 text-amber-400 border border-amber-400/30">
-                                    #{p.seed}
-                                  </span>
-                                )}
+                                <span className="truncate max-w-[130px]">{p.name}</span>
                               </div>
-                              {p.club && (
-                                <p className="text-[10px] text-slate-400 truncate">{p.club}</p>
-                              )}
                             </td>
-                            <td className="py-3 px-2 text-center text-slate-300 font-bold">
-                              {played}
+                            <td className="py-3 px-1.5 text-center text-slate-300 font-bold">{p.played}</td>
+                            <td className="py-3 px-1.5 text-center text-emerald-400 font-bold">{p.groupWins}</td>
+                            <td className="py-3 px-1.5 text-center text-rose-400 font-bold">{p.groupLosses}</td>
+                            <td className="py-3 px-2 text-center text-slate-300 font-score font-bold">
+                              {p.setsWon}-{p.setsLost} <span className="text-[10px] text-slate-500">({p.setDiff > 0 ? `+${p.setDiff}` : p.setDiff})</span>
                             </td>
-                            <td className="py-3 px-2 text-center text-emerald-400 font-black">
-                              {p.groupWins || 0}
+                            <td className="py-3 px-2 text-center text-slate-300 font-score font-bold">
+                              {p.pointsWon}-{p.pointsLost} <span className="text-[10px] text-slate-500">({p.pointDiff > 0 ? `+${p.pointDiff}` : p.pointDiff})</span>
                             </td>
-                            <td className="py-3 px-2 text-center text-rose-400 font-bold">
-                              {p.groupLosses || 0}
-                            </td>
-                            <td className="py-3 px-3 text-center font-black text-lime-400 font-score text-sm">
-                              {p.groupPoints || 0}
-                            </td>
+                            <td className="py-3 px-2.5 text-center font-black font-score text-lime-400 text-sm">{p.groupPoints}</td>
                             <td className="py-3 px-3 text-right">
                               {isTop2 ? (
-                                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 whitespace-nowrap">
-                                  Top 2 (Upper)
-                                </span>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30">Top 2 Bagan Atas</span>
                               ) : (
-                                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
-                                  Bottom 2 (Beginner)
-                                </span>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400">Pos {rank} Bagan Bawah</span>
                               )}
                             </td>
                           </tr>
@@ -260,23 +293,20 @@ export default function GroupStageViewer({
         </div>
       </div>
 
-      {/* Group Matches Schedule & Scoring */}
-      <div className="space-y-4">
+      <div className="space-y-4 pt-4 border-t border-slate-800">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <h3 className="text-lg font-black text-white flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-amber-400" />
-            Jadwal & Skor Pertandingan Fase Grup ({groupMatches.length} Match)
-          </h3>
+          <div>
+            <h3 className="text-lg font-black text-white flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-lime-400" />
+              Jadwal & Hasil Pertandingan Fase Grup (Best of 5 Sets)
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">Total 24 pertandingan round-robin. Menang 3 set untuk menang match.</p>
+          </div>
 
-          {/* Group Filter Tabs */}
-          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 p-1 rounded-xl">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             <button
               onClick={() => setSelectedGroupTab('ALL')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
-                selectedGroupTab === 'ALL'
-                  ? 'bg-lime-500 text-slate-950 font-black'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedGroupTab === 'ALL' ? 'bg-lime-500 text-slate-950 font-black shadow-md' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}
             >
               Semua Grup
             </button>
@@ -284,11 +314,7 @@ export default function GroupStageViewer({
               <button
                 key={g}
                 onClick={() => setSelectedGroupTab(g)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                  selectedGroupTab === g
-                    ? 'bg-lime-500 text-slate-950 font-black'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${selectedGroupTab === g ? 'bg-lime-500 text-slate-950 font-black' : 'bg-slate-900 text-slate-400'}`}
               >
                 {g}
               </button>
@@ -296,13 +322,21 @@ export default function GroupStageViewer({
           </div>
         </div>
 
-        {/* Matches Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {groupMatches
-            .filter((m) => selectedGroupTab === 'ALL' || m.groupName === selectedGroupTab)
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {tournament.matches
+            .filter((m) => m.phase === 'GROUP' && (selectedGroupTab === 'ALL' || m.groupName === selectedGroupTab || m.roundName?.includes(selectedGroupTab)))
             .map((match) => {
               const isFinished = match.status === 'FINISHED';
               const isLive = match.status === 'LIVE';
+              let setsWon1 = 0;
+              let setsWon2 = 0;
+              match.scores.forEach((s) => {
+                if (s.score1 > 0 || s.score2 > 0) {
+                  if (s.score1 > s.score2) setsWon1++;
+                  else if (s.score2 > s.score1) setsWon2++;
+                }
+              });
+              const activeScores = match.scores.filter((s) => s.score1 > 0 || s.score2 > 0);
 
               return (
                 <div
@@ -320,8 +354,20 @@ export default function GroupStageViewer({
                     <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300">
                       {match.groupName || 'Fase Grup'} • #{match.matchOrder}
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
                       <span>{match.court || 'Court 1'}</span>
+                      {match.referee && (
+                        <>
+                          <span className="text-slate-600">•</span>
+                          <span className="text-amber-300 font-semibold">🧑‍⚖️ {match.referee}</span>
+                        </>
+                      )}
+                      {match.scheduledTime && (
+                        <>
+                          <span className="text-slate-600">•</span>
+                          <span className="text-slate-400">🕒 {match.scheduledTime}</span>
+                        </>
+                      )}
                       {isLive && (
                         <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1 font-black">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
@@ -348,18 +394,27 @@ export default function GroupStageViewer({
                     >
                       <span className="truncate pr-2">{match.participant1?.name || 'TBD'}</span>
                       <div className="flex items-center gap-1 font-score">
-                        {match.scores.map((s, idx) => (
-                          <span
-                            key={idx}
-                            className={`w-6 h-6 rounded flex items-center justify-center border ${
-                              s.score1 > s.score2
-                                ? 'bg-slate-800 text-white font-black border-slate-600'
-                                : 'bg-slate-950 text-slate-400 border-slate-800'
-                            }`}
-                          >
-                            {s.score1}
+                        {activeScores.length > 0 ? (
+                          activeScores.map((s, idx) => (
+                            <span
+                              key={idx}
+                              className={`w-6 h-6 rounded-md flex items-center justify-center border text-xs ${
+                                s.score1 > s.score2
+                                  ? 'bg-slate-800 text-white font-black border-slate-600'
+                                  : 'bg-slate-950 text-slate-500 border-slate-800 font-bold'
+                              }`}
+                            >
+                              {s.score1}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-slate-600 text-xs">-</span>
+                        )}
+                        {(isFinished || isLive) && (
+                          <span className="ml-1.5 px-2 py-0.5 rounded-md bg-slate-950 border border-slate-700 text-lime-400 font-black text-xs">
+                            {setsWon1} Set
                           </span>
-                        ))}
+                        )}
                       </div>
                     </div>
 
@@ -373,18 +428,27 @@ export default function GroupStageViewer({
                     >
                       <span className="truncate pr-2">{match.participant2?.name || 'TBD'}</span>
                       <div className="flex items-center gap-1 font-score">
-                        {match.scores.map((s, idx) => (
-                          <span
-                            key={idx}
-                            className={`w-6 h-6 rounded flex items-center justify-center border ${
-                              s.score2 > s.score1
-                                ? 'bg-slate-800 text-white font-black border-slate-600'
-                                : 'bg-slate-950 text-slate-400 border-slate-800'
-                            }`}
-                          >
-                            {s.score2}
+                        {activeScores.length > 0 ? (
+                          activeScores.map((s, idx) => (
+                            <span
+                              key={idx}
+                              className={`w-6 h-6 rounded-md flex items-center justify-center border text-xs ${
+                                s.score2 > s.score1
+                                  ? 'bg-slate-800 text-white font-black border-slate-600'
+                                  : 'bg-slate-950 text-slate-500 border-slate-800 font-bold'
+                              }`}
+                            >
+                              {s.score2}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-slate-600 text-xs">-</span>
+                        )}
+                        {(isFinished || isLive) && (
+                          <span className="ml-1.5 px-2 py-0.5 rounded-md bg-slate-950 border border-slate-700 text-lime-400 font-black text-xs">
+                            {setsWon2} Set
                           </span>
-                        ))}
+                        )}
                       </div>
                     </div>
                   </div>

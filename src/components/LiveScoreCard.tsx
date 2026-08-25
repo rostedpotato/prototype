@@ -30,18 +30,8 @@ export default function LiveScoreCard({
 
   match.scores.forEach((s) => {
     if (s.score1 > 0 || s.score2 > 0) {
-      if (sport === 'BADMINTON') {
-        if ((s.score1 >= 21 || s.score2 >= 21) && Math.abs(s.score1 - s.score2) >= 2) {
-          if (s.score1 > s.score2) setsWon1++;
-          else setsWon2++;
-        }
-      } else {
-        // Padel (usually first to 6 with 2 margin or tiebreak)
-        if ((s.score1 >= 6 || s.score2 >= 6) && Math.abs(s.score1 - s.score2) >= 2) {
-          if (s.score1 > s.score2) setsWon1++;
-          else setsWon2++;
-        }
-      }
+      if (s.score1 > s.score2) setsWon1++;
+      else if (s.score2 > s.score1) setsWon2++;
     }
   });
 
@@ -75,6 +65,12 @@ export default function LiveScoreCard({
           <span className="font-semibold text-slate-300">
             {match.court || 'Court 1'}
           </span>
+          {match.referee && (
+            <>
+              <span className="text-slate-600">•</span>
+              <span className="text-amber-300 font-semibold">🧑‍⚖️ {match.referee}</span>
+            </>
+          )}
           <span className="text-slate-600">•</span>
           <span className="text-slate-400 font-medium">{match.roundName}</span>
         </div>
@@ -146,7 +142,7 @@ export default function LiveScoreCard({
               return (
                 <div
                   key={set.setNumber}
-                  className={`w-9 h-8 rounded-lg flex items-center justify-center text-sm font-bold border ${
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border ${
                     isCurrentActiveSet
                       ? 'bg-lime-500/20 text-lime-300 border-lime-500/50 shadow-inner'
                       : isWinner1 && set.score1 > set.score2
@@ -159,9 +155,11 @@ export default function LiveScoreCard({
               );
             })}
             {/* Sets summary tally */}
-            <div className="w-7 h-8 rounded-lg bg-slate-800/90 text-slate-200 border border-slate-700 flex items-center justify-center text-xs font-black ml-1">
-              {setsWon1}
-            </div>
+            {(isLive || isFinished || setsWon1 > 0 || setsWon2 > 0) && (
+              <div className="w-8 h-8 rounded-lg bg-lime-500/20 text-lime-300 border border-lime-500/40 flex items-center justify-center text-xs font-black ml-1">
+                {setsWon1}
+              </div>
+            )}
           </div>
         </div>
 
@@ -207,7 +205,7 @@ export default function LiveScoreCard({
               return (
                 <div
                   key={set.setNumber}
-                  className={`w-9 h-8 rounded-lg flex items-center justify-center text-sm font-bold border ${
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border ${
                     isCurrentActiveSet
                       ? 'bg-lime-500/20 text-lime-300 border-lime-500/50 shadow-inner'
                       : isWinner2 && set.score2 > set.score1
@@ -220,9 +218,11 @@ export default function LiveScoreCard({
               );
             })}
             {/* Sets summary tally */}
-            <div className="w-7 h-8 rounded-lg bg-slate-800/90 text-slate-200 border border-slate-700 flex items-center justify-center text-xs font-black ml-1">
-              {setsWon2}
-            </div>
+            {(isLive || isFinished || setsWon1 > 0 || setsWon2 > 0) && (
+              <div className="w-8 h-8 rounded-lg bg-lime-500/20 text-lime-300 border border-lime-500/40 flex items-center justify-center text-xs font-black ml-1">
+                {setsWon2}
+              </div>
+            )}
           </div>
         </div>
       </div>

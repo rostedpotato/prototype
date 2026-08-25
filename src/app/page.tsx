@@ -21,8 +21,6 @@ import { useDebounce } from '@/lib/useDebounce';
 export default function HomePage() {
   const { tournaments } = useTournaments();
   const { isAdmin } = useAdminAuth();
-  const [sportFilter, setSportFilter] = useState<'ALL' | SportType>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'LIVE' | 'UPCOMING' | 'COMPLETED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 350);
 
@@ -55,12 +53,7 @@ export default function HomePage() {
       });
   });
 
-  // Tournaments marked as LIVE
-  const liveTournaments = tournaments.filter((t) => t.status === 'LIVE');
-
   const filteredTournaments = tournaments.filter((t) => {
-    if (sportFilter !== 'ALL' && t.sport !== sportFilter) return false;
-    if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
     if (debouncedSearchQuery.trim()) {
       const q = debouncedSearchQuery.toLowerCase();
       const matchName = t.name.toLowerCase().includes(q);
@@ -165,88 +158,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Filters Bar */}
-        <div className="flex flex-wrap items-center gap-3 justify-between bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
-          {/* Sport Switcher Tabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-950 border border-slate-800 rounded-xl">
-            <button
-              onClick={() => setSportFilter('ALL')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                sportFilter === 'ALL'
-                  ? 'bg-lime-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Semua Cabor
-            </button>
-            <button
-              onClick={() => setSportFilter('BADMINTON')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                sportFilter === 'BADMINTON'
-                  ? 'bg-lime-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              🏸 Badminton
-            </button>
-            <button
-              onClick={() => setSportFilter('PADEL')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                sportFilter === 'PADEL'
-                  ? 'bg-cyan-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              🎾 Padel
-            </button>
-          </div>
-
-          {/* Status Switcher Tabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-950 border border-slate-800 rounded-xl overflow-x-auto">
-            <button
-              onClick={() => setStatusFilter('ALL')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                statusFilter === 'ALL'
-                  ? 'bg-slate-700 text-white'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Semua Status
-            </button>
-            <button
-              onClick={() => setStatusFilter('LIVE')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 ${
-                statusFilter === 'LIVE'
-                  ? 'bg-red-500 text-white'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-live-dot" />
-              🔴 LIVE
-            </button>
-            <button
-              onClick={() => setStatusFilter('UPCOMING')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                statusFilter === 'UPCOMING'
-                  ? 'bg-amber-500 text-slate-950'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              🕒 Akan Datang
-            </button>
-            <button
-              onClick={() => setStatusFilter('COMPLETED')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                statusFilter === 'COMPLETED'
-                  ? 'bg-emerald-500 text-slate-950'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              ✅ Selesai
-            </button>
-          </div>
-        </div>
-
         {/* Tournaments Grid */}
         {filteredTournaments.length === 0 ? (
           <div className="text-center py-16 bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl space-y-3">
@@ -254,8 +165,6 @@ export default function HomePage() {
             <p className="text-slate-300 font-bold text-sm">Tidak ada turnamen yang sesuai filter.</p>
             <button
               onClick={() => {
-                setSportFilter('ALL');
-                setStatusFilter('ALL');
                 setSearchQuery('');
               }}
               className="text-xs text-lime-400 hover:underline font-semibold"

@@ -19,12 +19,68 @@ export default function BracketViewer({
   const { isAdmin } = useAdminAuth();
   const [activePhase, setActivePhase] = useState<'KNOCKOUT_UPPER' | 'KNOCKOUT_BOTTOM'>(defaultPhase);
 
-  const isTwoStage = tournament.format === 'TWO_STAGE';
+  const isTwoStage = tournament.format?.startsWith('TWO_STAGE');
+
+  const knockoutUpperMatches = tournament.matches.filter((m) => m.phase === 'KNOCKOUT_UPPER');
+  const knockoutBottomMatches = tournament.matches.filter((m) => m.phase === 'KNOCKOUT_BOTTOM');
+  const hasKnockoutMatches = knockoutUpperMatches.length > 0 || knockoutBottomMatches.length > 0;
 
   // Filter matches by phase if TWO_STAGE, otherwise use all matches
   const targetMatches = isTwoStage
     ? tournament.matches.filter((m) => m.phase === activePhase)
     : tournament.matches;
+
+  // If Two-Stage and Knockout Brackets are not generated yet, show informative locked state
+  if (isTwoStage && !hasKnockoutMatches) {
+    return (
+      <div className="w-full bg-slate-900/60 border border-slate-800 rounded-3xl p-8 sm:p-12 text-center space-y-5 shadow-xl">
+        <div className="w-16 h-16 rounded-3xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mx-auto shadow-inner">
+          <Layers className="w-8 h-8 text-blue-400" />
+        </div>
+
+        <div className="max-w-xl mx-auto space-y-2.5">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold">
+            <Sparkles className="w-3.5 h-3.5" />
+            Sistem Turnamen Dua Tahap (Two-Stage)
+          </span>
+          <h3 className="text-xl sm:text-2xl font-black text-white">
+            Bagan Knockout Dimulai Setelah Fase Grup Selesai
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+            Turnamen ini sedang dalam <strong>Fase 1 (Round Robin 4 Grup)</strong>. Setelah semua pertandingan grup selesai, Admin akan mengunci klasemen dan membuat <strong>2 Bagan Knockout Terpisah</strong> yang langsung dimulai dari babak <strong>Perempat Final (Quarter Final)</strong>:
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto text-left pt-2">
+          <div className="p-4 rounded-2xl bg-blue-950/40 border border-blue-800/50 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-blue-400">
+              <Trophy className="w-4 h-4 text-amber-400" />
+              🏆 Bagan Atas (Upper Bracket)
+            </div>
+            <p className="text-xs text-slate-300 font-semibold">
+              Diikuti oleh 8 tim (Peringkat 1 & 2 dari Grup 1, 2, 3, dan 4).
+            </p>
+            <p className="text-[11px] text-slate-400">
+              Mulai dari QF ➔ Semifinal ➔ Final (Memperebutkan Juara 1 Bagan Atas).
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-800/50 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+              <Medal className="w-4 h-4 text-emerald-400" />
+              🏅 Bagan Bawah (Bottom Bracket)
+            </div>
+            <p className="text-xs text-slate-300 font-semibold">
+              Diikuti oleh 8 tim (Peringkat 3 & 4 dari Grup 1, 2, 3, dan 4).
+            </p>
+            <p className="text-[11px] text-slate-400">
+              Mulai dari QF ➔ Semifinal ➔ Final (Memperebutkan Juara 1 Bagan Bawah).
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Group matches by round
   const maxRound = Math.max(...targetMatches.map((m) => m.round), 1);
@@ -44,8 +100,8 @@ export default function BracketViewer({
   return (
     <div className="w-full space-y-6">
       {/* Two-Stage Bracket Switcher */}
-      {isTwoStage && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-3 rounded-2xl">
+      {isTwoStage && hasKnockoutMatches && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-2xl shadow-lg">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-amber-400" />
             <span className="text-xs font-black text-white uppercase tracking-wider">
@@ -53,29 +109,29 @@ export default function BracketViewer({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setActivePhase('KNOCKOUT_UPPER')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all ${
                 activePhase === 'KNOCKOUT_UPPER'
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 border border-blue-400'
                   : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
               }`}
             >
               <Trophy className="w-4 h-4 text-amber-400" />
-              <span>Bagan Upper (Top 2 Grup)</span>
+              <span>🏆 Bagan Atas (Top 2 Grup)</span>
             </button>
 
             <button
               onClick={() => setActivePhase('KNOCKOUT_BOTTOM')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all ${
                 activePhase === 'KNOCKOUT_BOTTOM'
                   ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 border border-emerald-400'
                   : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
               }`}
             >
               <Medal className="w-4 h-4 text-emerald-400" />
-              <span>Bagan Beginner (Bottom 2 Grup)</span>
+              <span>🏅 Bagan Bawah (Peringkat 3 & 4)</span>
             </button>
           </div>
         </div>
@@ -115,8 +171,8 @@ export default function BracketViewer({
                 <Sparkles className="w-3.5 h-3.5" />
                 {isTwoStage
                   ? activePhase === 'KNOCKOUT_UPPER'
-                    ? 'JUARA 1 BAGAN UPPER BEGINNER'
-                    : 'JUARA 1 BAGAN BEGINNER'
+                    ? 'JUARA 1 BAGAN ATAS (UPPER BRACKET)'
+                    : 'JUARA 1 BAGAN BAWAH (BOTTOM BRACKET)'
                   : 'JUARA 1 / TOURNAMENT CHAMPION'}
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-white">{champion.name}</h2>
@@ -145,7 +201,13 @@ export default function BracketViewer({
               .filter((m) => m.round === roundNum)
               .sort((a, b) => a.matchOrder - b.matchOrder);
 
-            const roundTitle = matchesInRound[0]?.roundName || `Babak ${roundNum}`;
+            let roundTitle = matchesInRound[0]?.roundName || `Babak ${roundNum}`;
+            if (isTwoStage) {
+              if (roundNum === 1) roundTitle = 'Perempat Final (Quarter Final)';
+              else if (roundNum === 2) roundTitle = 'Semifinal';
+              else if (roundNum === 3) roundTitle = activePhase === 'KNOCKOUT_UPPER' ? 'Final Bagan Atas' : 'Final Bagan Bawah';
+            }
+
             const isFinal = roundNum === maxRound;
             const hasNextRound = roundNum < maxRound;
 
@@ -201,9 +263,16 @@ export default function BracketViewer({
                             >
                               {/* Match Card Top Strip */}
                               <div className="flex items-center justify-between px-3 py-1.5 bg-slate-950 border-b border-slate-800 text-[11px]">
-                                <span className="font-extrabold text-slate-400">
-                                  {match.court || `Match #${match.matchOrder}`}
-                                </span>
+                                <div className="flex items-center gap-1.5 truncate pr-2">
+                                  <span className="font-extrabold text-slate-400">
+                                    {match.court || `Match #${match.matchOrder}`}
+                                  </span>
+                                  {match.referee && (
+                                    <span className="text-amber-300 font-semibold text-[10px]">
+                                      • 🧑‍⚖️ {match.referee}
+                                    </span>
+                                  )}
+                                </div>
 
                                 <div>
                                   {isLive && (
@@ -264,7 +333,7 @@ export default function BracketViewer({
                                       return (
                                         <span
                                           key={idx}
-                                          className={`w-5 h-5 rounded flex items-center justify-center border ${
+                                          className={`w-6 h-6 rounded flex items-center justify-center border font-bold text-xs ${
                                             s.score1 > s.score2
                                               ? 'bg-slate-800 border-slate-600 text-white font-black'
                                               : 'bg-slate-950 border-slate-800 text-slate-400'
@@ -314,7 +383,7 @@ export default function BracketViewer({
                                       return (
                                         <span
                                           key={idx}
-                                          className={`w-5 h-5 rounded flex items-center justify-center border ${
+                                          className={`w-6 h-6 rounded flex items-center justify-center border font-bold text-xs ${
                                             s.score2 > s.score1
                                               ? 'bg-slate-800 border-slate-600 text-white font-black'
                                               : 'bg-slate-950 border-slate-800 text-slate-400'

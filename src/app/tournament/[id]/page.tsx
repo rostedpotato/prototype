@@ -33,7 +33,7 @@ export default function TournamentDetailPage() {
 
   // Auto set to GROUP tab if TWO_STAGE and not yet group stage completed
   useEffect(() => {
-    if (tournament?.format === 'TWO_STAGE' && !tournament.groupStageCompleted) {
+    if (tournament?.format?.startsWith('TWO_STAGE') && !tournament.groupStageCompleted) {
       setActiveTab('GROUP');
     }
   }, [tournament?.format, tournament?.groupStageCompleted]);
@@ -210,8 +210,8 @@ export default function TournamentDetailPage() {
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-amber-400" />
-                {tournament.format === 'TWO_STAGE'
-                  ? 'Bagan Babak Gugur (Upper & Beginner)'
+                {tournament.format?.startsWith('TWO_STAGE')
+                  ? 'Bagan Babak Gugur (Bagan Atas & Bagan Bawah)'
                   : 'Bagan Babak Utama (Single Elimination Tree)'}
               </h3>
               <span className="text-[11px] text-slate-400">

@@ -136,20 +136,86 @@ export function calculateMatchWinner(
   scores: SetScore[],
   setsToWin: number = 2,
   targetGames?: number
-): { winnerSide: 1 | 2 | null; setsWon1: number; setsWon2: number; isMatchOver: boolean } {
+): {
+  winnerSide: 1 | 2 | null;
+  setsWon1: number;
+  setsWon2: number;
+  pointsWon1: number;
+  pointsWon2: number;
+  isMatchOver: boolean;
+} {
   let setsWon1 = 0;
   let setsWon2 = 0;
+  let pointsWon1 = 0;
+  let pointsWon2 = 0;
 
   scores.forEach((s) => {
+    pointsWon1 += s.score1 || 0;
+    pointsWon2 += s.score2 || 0;
+
+    // Check if set was won
     const res = checkSetStatus(sport, s.score1, s.score2, targetGames);
     if (res.isFinished) {
       if (res.winner === 1) setsWon1++;
       else if (res.winner === 2) setsWon2++;
+    } else if (s.score1 > 0 || s.score2 > 0) {
+      // Fallback if set has points and unequal
+      if (s.score1 > s.score2 && (s.score1 >= (targetGames || 6) || Math.abs(s.score1 - s.score2) >= 2)) {
+        setsWon1++;
+      } else if (s.score2 > s.score1 && (s.score2 >= (targetGames || 6) || Math.abs(s.score2 - s.score1) >= 2)) {
+        setsWon2++;
+      }
     }
   });
 
   const isMatchOver = setsWon1 >= setsToWin || setsWon2 >= setsToWin;
   const winnerSide = setsWon1 >= setsToWin ? 1 : setsWon2 >= setsToWin ? 2 : null;
 
-  return { winnerSide, setsWon1, setsWon2, isMatchOver };
+  return { winnerSide, setsWon1, setsWon2, pointsWon1, pointsWon2, isMatchOver };
+}
+
+export function getSetsToWinForRound(
+  sport: SportType,
+  customPadelScoring: boolean | undefined,
+  roundName: string = ''
+): number {
+  if (sport !== 'PADEL' || !customPadelScoring) return 2;
+
+  const lower = roundName.toLowerCase();
+  if (
+    lower.includes('final') &&
+    !lower.includes('semifinal') &&
+    !lower.includes('perempat') &&
+    !lower.includes('qf') &&
+    !lower.includes('sf')
+  ) {
+    return 6; // Final: First to 6 sets
+  }
+  if (lower.includes('semifinal') || lower.includes('sf')) {
+    return 4; // Semifinal: First to 4 sets
+  }
+  // Group Stage & Quarterfinals: Best of 5 (First to 3 sets)
+  return 3;
+}
+
+export function getMaxSetsForRound(
+  sport: SportType,
+  customPadelScoring: boolean | undefined,
+  roundName: string = ''
+): number {
+  const setsToWin = getSetsToWinForRound(sport, customPadelScoring, roundName);
+  if (setsToWin === 3) return 5; // Best of 5
+  if (setsToWin === 4) return 7; // First to 4
+  if (setsToWin === 6) return 11; // First to 6
+  return 3; // Default best of 3
+}
+
+export function getTargetGamesForMatch(
+  sport: SportType,
+  customPadelScoring: boolean | undefined,
+  roundName: string = ''
+): number | undefined {
+  if (sport !== 'PADEL') return undefined;
+  // In padel, points/games in each set is standard 6 (first to 6 games per set)
+  return 6;
 }

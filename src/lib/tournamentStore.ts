@@ -2,7 +2,7 @@
 
 import { Tournament, Match, SetScore, MatchStatus, Participant } from '@/types/tournament';
 import { INITIAL_TOURNAMENTS } from './initialData';
-import { calculateMatchWinner } from './scoreRules';
+import { calculateMatchWinner, getSetsToWinForRound, getTargetGamesForMatch } from './scoreRules';
 import { generateKnockoutStageFromGroups } from './bracketGenerator';
 
 const STORAGE_KEY = 'racket_tournaments_v2';
@@ -135,9 +135,10 @@ export const TournamentService = {
     if (regIndex === -1) return false;
 
     const reg = t.registrations[regIndex];
+    const previousStatus = reg.status;
     reg.status = status;
 
-    if (status === 'APPROVED') {
+    if (status === 'APPROVED' && previousStatus !== 'APPROVED') {
       const newParticipant: import('@/types/tournament').Participant = {
         id: crypto.randomUUID(),
         name: reg.teamName,
@@ -146,9 +147,23 @@ export const TournamentService = {
         reclubId1: reg.reclubId1,
         reclubId2: reg.reclubId2,
         whatsapp: reg.whatsapp,
-        club: reg.sector // Store sector info in club field or maybe we should add sector to participant? For now using club.
+        club: reg.sector, // Store sector info in club field
+        registrationId: reg.id // Link it back so we can cancel later
       };
       t.participants = [...t.participants, newParticipant];
+    } else if (previousStatus === 'APPROVED' && status !== 'APPROVED') {
+      // Remove the participant linked to this registration
+      t.participants = t.participants.filter(p => {
+        if (p.registrationId) return p.registrationId !== reg.id;
+        // Fallback for participants approved before we added registrationId
+        return p.name !== reg.teamName;
+      });
+    }
+
+    // FORCE SYNC: Self-healing to ensure participants array perfectly matches APPROVED registrations
+    if (t.registrations && t.registrations.length > 0) {
+      const approvedTeamNames = new Set(t.registrations.filter(r => r.status === 'APPROVED').map(r => r.teamName));
+      t.participants = t.participants.filter(p => approvedTeamNames.has(p.name));
     }
 
     list[index] = t;
@@ -258,6 +273,7 @@ export const TournamentService = {
       winnerId?: string | null;
       court?: string;
       scheduledTime?: string;
+      referee?: string;
       participant1?: Participant | null;
       participant2?: Participant | null;
     }
@@ -275,7 +291,18 @@ export const TournamentService = {
 
     // Auto-detect match winner if scores dictate it
     if (payload.scores) {
-      const winCheck = calculateMatchWinner(tournament.sport, payload.scores, 2);
+      const setsToWin = getSetsToWinForRound(
+        tournament.sport,
+        tournament.rules?.customPadelScoring,
+        currentMatch.roundName
+      );
+      const targetGames = getTargetGamesForMatch(
+        tournament.sport,
+        tournament.rules?.customPadelScoring,
+        currentMatch.roundName
+      );
+
+      const winCheck = calculateMatchWinner(tournament.sport, payload.scores, setsToWin, targetGames);
       if (winCheck.isMatchOver && winCheck.winnerSide) {
         const autoWinner =
           winCheck.winnerSide === 1 ? currentMatch.participant1 : currentMatch.participant2;
@@ -324,7 +351,7 @@ export const TournamentService = {
     }
 
     // If tournament is TWO_STAGE and match was in group stage, recalculate group standings
-    if (tournament.format === 'TWO_STAGE' && currentMatch.phase === 'GROUP') {
+    if (tournament.format?.startsWith('TWO_STAGE') && currentMatch.phase === 'GROUP') {
       const groupMatches = matches.filter((m) => m.phase === 'GROUP');
       const updatedParticipants = tournament.participants.map((p) => {
         const participantMatches = groupMatches.filter(
@@ -334,44 +361,80 @@ export const TournamentService = {
         );
 
         let wins = 0;
-        let points = 0;
+        let losses = 0;
+        let setsWon = 0;
+        let setsLost = 0;
+        let pointsWon = 0;
+        let pointsLost = 0;
 
         participantMatches.forEach((m) => {
           if (m.winnerId === p.id) {
             wins += 1;
-            points += 2; // 2 points per win
+          } else if (m.winnerId) {
+            losses += 1;
           }
-          // Also count set scores for tie-breaking
+
           m.scores.forEach((s) => {
-            if (m.participant1?.id === p.id) {
-              points += (s.score1 - s.score2) * 0.01;
-            } else if (m.participant2?.id === p.id) {
-              points += (s.score2 - s.score1) * 0.01;
+            const isP1 = m.participant1?.id === p.id;
+            const myScore = isP1 ? s.score1 : s.score2;
+            const oppScore = isP1 ? s.score2 : s.score1;
+
+            if (myScore > 0 || oppScore > 0) {
+              pointsWon += myScore;
+              pointsLost += oppScore;
+              if (myScore > oppScore) setsWon += 1;
+              else if (oppScore > myScore) setsLost += 1;
             }
           });
         });
 
-        const losses = participantMatches.length - wins;
+        // Simple scoring: Menang +1, Kalah +0
+        const points = wins * 1;
+        const setDiff = setsWon - setsLost;
+        const pointDiff = pointsWon - pointsLost;
 
         return {
           ...p,
           groupWins: wins,
           groupLosses: losses,
-          groupPoints: Math.round(points * 100) / 100,
+          groupPoints: points,
+          groupSetsWon: setsWon,
+          groupSetsLost: setsLost,
+          groupSetDiff: setDiff,
+          groupPointsWon: pointsWon,
+          groupPointsLost: pointsLost,
+          groupPointDiff: pointDiff,
         };
       });
 
-      // Assign group ranks
+      // Assign group ranks using tiebreaker
       const groups = ['Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'];
       groups.forEach((gName) => {
         const inGroup = updatedParticipants.filter((p) => p.group === gName);
         inGroup.sort((a, b) => {
+          // 1. Match Win Points (PTS: +1 per win)
           if ((b.groupPoints || 0) !== (a.groupPoints || 0)) {
             return (b.groupPoints || 0) - (a.groupPoints || 0);
           }
-          if ((b.groupWins || 0) !== (a.groupWins || 0)) {
-            return (b.groupWins || 0) - (a.groupWins || 0);
+          // 2. Set Difference (SD)
+          const setDiffA = a.groupSetDiff ?? 0;
+          const setDiffB = b.groupSetDiff ?? 0;
+          if (setDiffB !== setDiffA) {
+            return setDiffB - setDiffA;
           }
+          // 3. Point Difference (PD)
+          const ptDiffA = a.groupPointDiff ?? 0;
+          const ptDiffB = b.groupPointDiff ?? 0;
+          if (ptDiffB !== ptDiffA) {
+            return ptDiffB - ptDiffA;
+          }
+          // 4. Points Won (PW)
+          const ptsWonA = a.groupPointsWon ?? 0;
+          const ptsWonB = b.groupPointsWon ?? 0;
+          if (ptsWonB !== ptsWonA) {
+            return ptsWonB - ptsWonA;
+          }
+          // 5. Seed
           return (a.seed || 999) - (b.seed || 999);
         });
 
@@ -404,7 +467,7 @@ export const TournamentService = {
     if (tIndex === -1) return null;
 
     const tournament = { ...list[tIndex] };
-    if (tournament.format !== 'TWO_STAGE') return null;
+    if (!tournament.format?.startsWith('TWO_STAGE')) return null;
 
     const { upperBracketMatches, bottomBracketMatches } = generateKnockoutStageFromGroups(
       tournament.id,

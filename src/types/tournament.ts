@@ -38,12 +38,19 @@ export interface Participant {
   reclubId1?: string;
   reclubId2?: string;
   whatsapp?: string;
+  registrationId?: string; // Link back to the registration request
   // For Two-Stage Tournament
   group?: string; // 'Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'
   groupRank?: number; // 1, 2, 3, 4 - final ranking in group stage
-  groupPoints?: number; // Total points earned in group stage
-  groupWins?: number; // Total wins in group stage
-  groupLosses?: number; // Total losses in group stage
+  groupPoints?: number; // Total match win points earned in group stage (Menang +1, Kalah +0)
+  groupWins?: number; // Total match wins in group stage
+  groupLosses?: number; // Total match losses in group stage
+  groupSetsWon?: number; // Total sets won
+  groupSetsLost?: number; // Total sets lost
+  groupSetDiff?: number; // Set difference (Sets Won - Sets Lost)
+  groupPointsWon?: number; // Total game/point scores won across all sets
+  groupPointsLost?: number; // Total game/point scores conceded
+  groupPointDiff?: number; // Point difference (Points Won - Points Lost)
 }
 
 export interface SetScore {
@@ -65,6 +72,7 @@ export interface Match {
   servingSide?: 1 | 2; // 1 for participant1, 2 for participant2
   court?: string;
   scheduledTime?: string;
+  referee?: string; // e.g. "Wasit 1", "Wasit 2", etc.
   status: MatchStatus;
   winnerId?: string | null;
   nextMatchId?: string | null;
