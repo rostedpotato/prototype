@@ -149,6 +149,12 @@ export function generateGroupStageMatches(
     p.groupWins = 0;
     p.groupLosses = 0;
     p.groupRank = 0;
+    p.groupSetsWon = 0;
+    p.groupSetsLost = 0;
+    p.groupSetDiff = 0;
+    p.groupPointsWon = 0;
+    p.groupPointsLost = 0;
+    p.groupPointDiff = 0;
     
     groupedParticipants.push(p);
     groupMaps[p.group].push(p);
@@ -217,30 +223,11 @@ export function generateKnockoutStageFromGroups(
   
   groups.forEach((groupName) => {
     const groupTeams = groupedParticipants.filter((p) => p.group === groupName);
-    const sorted = groupTeams.sort((a, b) => {
-      // 1. Points (PTS: +1 per win)
-      if ((b.groupPoints || 0) !== (a.groupPoints || 0)) {
-        return (b.groupPoints || 0) - (a.groupPoints || 0);
-      }
-      // 2. Set Difference (SD)
-      const setDiffA = a.groupSetDiff ?? 0;
-      const setDiffB = b.groupSetDiff ?? 0;
-      if (setDiffB !== setDiffA) {
-        return setDiffB - setDiffA;
-      }
-      // 3. Point Difference (PD)
-      const ptDiffA = a.groupPointDiff ?? 0;
-      const ptDiffB = b.groupPointDiff ?? 0;
-      if (ptDiffB !== ptDiffA) {
-        return ptDiffB - ptDiffA;
-      }
-      // 4. Points Won (PW)
-      const ptsWonA = a.groupPointsWon ?? 0;
-      const ptsWonB = b.groupPointsWon ?? 0;
-      if (ptsWonB !== ptsWonA) {
-        return ptsWonB - ptsWonA;
-      }
-      // 5. Seed
+    const sorted = [...groupTeams].sort((a, b) => {
+      if ((b.groupPoints || 0) !== (a.groupPoints || 0)) return (b.groupPoints || 0) - (a.groupPoints || 0);
+      if ((b.groupSetDiff || 0) !== (a.groupSetDiff || 0)) return (b.groupSetDiff || 0) - (a.groupSetDiff || 0);
+      if ((b.groupPointDiff || 0) !== (a.groupPointDiff || 0)) return (b.groupPointDiff || 0) - (a.groupPointDiff || 0);
+      if ((b.groupPointsWon || 0) !== (a.groupPointsWon || 0)) return (b.groupPointsWon || 0) - (a.groupPointsWon || 0);
       return (a.seed || 999) - (b.seed || 999);
     });
     
@@ -253,20 +240,6 @@ export function generateKnockoutStageFromGroups(
   });
 
   // Extract Top 2 and Bottom 2 from each group
-  const upperBracketTeams: Participant[] = [];
-  const bottomBracketTeams: Participant[] = [];
-  
-  groups.forEach((groupName) => {
-    const ranked = rankedGroups[groupName];
-    // Top 2 go to Upper Bracket
-    upperBracketTeams.push({ ...ranked[0], group: undefined, groupRank: undefined, groupPoints: undefined, groupWins: undefined, groupLosses: undefined });
-    upperBracketTeams.push({ ...ranked[1], group: undefined, groupRank: undefined, groupPoints: undefined, groupWins: undefined, groupLosses: undefined });
-    
-    // Bottom 2 go to Bottom Bracket
-    bottomBracketTeams.push({ ...ranked[2], group: undefined, groupRank: undefined, groupPoints: undefined, groupWins: undefined, groupLosses: undefined });
-    bottomBracketTeams.push({ ...ranked[3], group: undefined, groupRank: undefined, groupPoints: undefined, groupWins: undefined, groupLosses: undefined });
-  });
-
   // Seeding for knockout: ensure teams from same group don't meet in quarterfinals
   // Standard seeding: 1A vs 2B, 1C vs 2D, 1B vs 2A, 1D vs 2C (for upper)
   const seedUpperBracket = () => {
@@ -274,32 +247,32 @@ export function generateKnockoutStageFromGroups(
     
     // Place group winners and runners-up in specific positions
     // Position mapping to avoid same-group matchups in QF
-    seeded[0] = rankedGroups['Grup 1'][0]; // 1A
-    seeded[1] = rankedGroups['Grup 2'][1]; // 2B
-    seeded[2] = rankedGroups['Grup 3'][0]; // 1C
-    seeded[3] = rankedGroups['Grup 4'][1]; // 2D
-    seeded[4] = rankedGroups['Grup 2'][0]; // 1B
-    seeded[5] = rankedGroups['Grup 1'][1]; // 2A
-    seeded[6] = rankedGroups['Grup 4'][0]; // 1D
-    seeded[7] = rankedGroups['Grup 3'][1]; // 2C
+    seeded[0] = rankedGroups['Grup 1']?.[0] ?? null; // 1A
+    seeded[1] = rankedGroups['Grup 2']?.[1] ?? null; // 2B
+    seeded[2] = rankedGroups['Grup 3']?.[0] ?? null; // 1C
+    seeded[3] = rankedGroups['Grup 4']?.[1] ?? null; // 2D
+    seeded[4] = rankedGroups['Grup 2']?.[0] ?? null; // 1B
+    seeded[5] = rankedGroups['Grup 1']?.[1] ?? null; // 2A
+    seeded[6] = rankedGroups['Grup 4']?.[0] ?? null; // 1D
+    seeded[7] = rankedGroups['Grup 3']?.[1] ?? null; // 2C
     
-    return seeded.map((p) => p ? { ...p, group: undefined, groupRank: undefined, groupPoints: undefined, groupWins: undefined, groupLosses: undefined } : null);
+    return seeded;
   };
 
   const seedBottomBracket = () => {
     const seeded: (Participant | null)[] = new Array(8).fill(null);
     
     // Similar logic for bottom bracket
-    seeded[0] = rankedGroups['Grup 1'][2]; // 3A
-    seeded[1] = rankedGroups['Grup 2'][3]; // 4B
-    seeded[2] = rankedGroups['Grup 3'][2]; // 3C
-    seeded[3] = rankedGroups['Grup 4'][3]; // 4D
-    seeded[4] = rankedGroups['Grup 2'][2]; // 3B
-    seeded[5] = rankedGroups['Grup 1'][3]; // 4A
-    seeded[6] = rankedGroups['Grup 4'][2]; // 3D
-    seeded[7] = rankedGroups['Grup 3'][3]; // 4C
+    seeded[0] = rankedGroups['Grup 1']?.[2] ?? null; // 3A
+    seeded[1] = rankedGroups['Grup 2']?.[3] ?? null; // 4B
+    seeded[2] = rankedGroups['Grup 3']?.[2] ?? null; // 3C
+    seeded[3] = rankedGroups['Grup 4']?.[3] ?? null; // 4D
+    seeded[4] = rankedGroups['Grup 2']?.[2] ?? null; // 3B
+    seeded[5] = rankedGroups['Grup 1']?.[3] ?? null; // 4A
+    seeded[6] = rankedGroups['Grup 4']?.[2] ?? null; // 3D
+    seeded[7] = rankedGroups['Grup 3']?.[3] ?? null; // 4C
     
-    return seeded.map((p) => p ? { ...p, group: undefined, groupRank: undefined, groupPoints: undefined, groupWins: undefined, groupLosses: undefined } : null);
+    return seeded;
   };
 
   const generateQuarterFinals = (teams: (Participant | null)[], phase: 'KNOCKOUT_UPPER' | 'KNOCKOUT_BOTTOM') => {

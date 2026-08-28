@@ -153,18 +153,11 @@ export function calculateMatchWinner(
     pointsWon1 += s.score1 || 0;
     pointsWon2 += s.score2 || 0;
 
-    // Check if set was won
+    // Check if set was won via the rules engine
     const res = checkSetStatus(sport, s.score1, s.score2, targetGames);
     if (res.isFinished) {
       if (res.winner === 1) setsWon1++;
       else if (res.winner === 2) setsWon2++;
-    } else if (s.score1 > 0 || s.score2 > 0) {
-      // Fallback if set has points and unequal
-      if (s.score1 > s.score2 && (s.score1 >= (targetGames || 6) || Math.abs(s.score1 - s.score2) >= 2)) {
-        setsWon1++;
-      } else if (s.score2 > s.score1 && (s.score2 >= (targetGames || 6) || Math.abs(s.score2 - s.score1) >= 2)) {
-        setsWon2++;
-      }
     }
   });
 

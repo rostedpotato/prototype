@@ -555,7 +555,6 @@ export default function AdminTournamentManagePage() {
           tournamentId={tournament.id}
           match={selectedMatch}
           sport={tournament.sport}
-          pointsPerSet={tournament.rules.pointsPerSet}
           isOpen={true}
           onClose={() => setSelectedMatch(null)}
         />

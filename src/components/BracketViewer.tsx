@@ -83,7 +83,7 @@ export default function BracketViewer({
   }
 
   // Group matches by round
-  const maxRound = Math.max(...targetMatches.map((m) => m.round), 1);
+  const maxRound = targetMatches.length > 0 ? Math.max(...targetMatches.map((m) => m.round)) : 1;
   const roundsArray = Array.from({ length: maxRound }, (_, i) => i + 1);
 
   // Find champion if final is finished

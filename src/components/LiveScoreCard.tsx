@@ -2,6 +2,7 @@
 
 import { Match, SportType } from '@/types/tournament';
 import { useAdminAuth } from '@/lib/authStore';
+import { getMatchSetsSummary } from '@/lib/standingUtils';
 import { Clock, CheckCircle2, SlidersHorizontal } from 'lucide-react';
 
 interface LiveScoreCardProps {
@@ -23,17 +24,7 @@ export default function LiveScoreCard({
 
   const isLive = match.status === 'LIVE';
   const isFinished = match.status === 'FINISHED';
-
-  // Calculate sets won by each participant
-  let setsWon1 = 0;
-  let setsWon2 = 0;
-
-  match.scores.forEach((s) => {
-    if (s.score1 > 0 || s.score2 > 0) {
-      if (s.score1 > s.score2) setsWon1++;
-      else if (s.score2 > s.score1) setsWon2++;
-    }
-  });
+  const { setsWon1, setsWon2 } = getMatchSetsSummary(match.scores);
 
   const isWinner1 = match.winnerId && match.winnerId === match.participant1?.id;
   const isWinner2 = match.winnerId && match.winnerId === match.participant2?.id;

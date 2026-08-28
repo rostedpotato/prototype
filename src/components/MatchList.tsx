@@ -14,27 +14,42 @@ interface MatchListProps {
 export default function MatchList({ tournament, onOpenScoreControl }: MatchListProps) {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [courtFilter, setCourtFilter] = useState<string>('ALL');
+  const [timeFilter, setTimeFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const debouncedSearchQuery = useDebounce(searchQuery, 350);
 
-  const filteredMatches = tournament.matches.filter((m) => {
-    // Status filter
-    if (statusFilter !== 'ALL' && m.status !== statusFilter) return false;
+  const uniqueTimes = Array.from(
+    new Set(tournament.matches.map((m) => m.scheduledTime).filter(Boolean))
+  ).sort() as string[];
 
-    // Court filter
-    if (courtFilter !== 'ALL' && m.court !== courtFilter) return false;
+  const filteredMatches = tournament.matches
+    .filter((m) => {
+      // Status filter
+      if (statusFilter !== 'ALL' && m.status !== statusFilter) return false;
 
-    // Search query
-    if (debouncedSearchQuery.trim()) {
-      const q = debouncedSearchQuery.toLowerCase();
-      const p1Match = m.participant1?.name?.toLowerCase().includes(q);
-      const p2Match = m.participant2?.name?.toLowerCase().includes(q);
-      const roundMatch = m.roundName.toLowerCase().includes(q);
-      if (!p1Match && !p2Match && !roundMatch) return false;
-    }
+      // Court filter
+      if (courtFilter !== 'ALL' && m.court !== courtFilter) return false;
 
-    return true;
-  });
+      // Time filter
+      if (timeFilter !== 'ALL' && m.scheduledTime !== timeFilter) return false;
+
+      // Search query
+      if (debouncedSearchQuery.trim()) {
+        const q = debouncedSearchQuery.toLowerCase();
+        const p1Match = m.participant1?.name?.toLowerCase().includes(q);
+        const p2Match = m.participant2?.name?.toLowerCase().includes(q);
+        const roundMatch = m.roundName.toLowerCase().includes(q);
+        if (!p1Match && !p2Match && !roundMatch) return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      // Sort matches chronologically based on scheduledTime
+      const timeA = a.scheduledTime || '23:59';
+      const timeB = b.scheduledTime || '23:59';
+      return timeA.localeCompare(timeB);
+    });
 
   return (
     <div className="space-y-6">
@@ -74,17 +89,32 @@ export default function MatchList({ tournament, onOpenScoreControl }: MatchListP
           ))}
         </div>
 
-        {/* Court Dropdown */}
-        <div className="w-full md:w-auto">
+        {/* Dropdowns (Court & Time) */}
+        <div className="flex gap-2 w-full md:w-auto">
+          {/* Court Dropdown */}
           <select
             value={courtFilter}
             onChange={(e) => setCourtFilter(e.target.value)}
-            className="w-full md:w-44 bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:outline-none focus:border-lime-400"
+            className="w-full md:w-40 bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:outline-none focus:border-lime-400"
           >
             <option value="ALL">Semua Lapangan</option>
             {tournament.courts.map((court) => (
               <option key={court} value={court}>
                 {court}
+              </option>
+            ))}
+          </select>
+
+          {/* Time Dropdown */}
+          <select
+            value={timeFilter}
+            onChange={(e) => setTimeFilter(e.target.value)}
+            className="w-full md:w-36 bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:outline-none focus:border-lime-400"
+          >
+            <option value="ALL">Semua Jam</option>
+            {uniqueTimes.map((time) => (
+              <option key={time} value={time}>
+                {time}
               </option>
             ))}
           </select>

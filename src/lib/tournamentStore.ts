@@ -3,6 +3,7 @@
 import { Tournament, Match, SetScore, MatchStatus, Participant } from '@/types/tournament';
 import { INITIAL_TOURNAMENTS } from './initialData';
 import { calculateMatchWinner, getSetsToWinForRound, getTargetGamesForMatch } from './scoreRules';
+import { calculateGroupStandings } from './standingUtils';
 import { generateKnockoutStageFromGroups } from './bracketGenerator';
 
 const STORAGE_KEY = 'racket_tournaments_v2';
@@ -287,6 +288,8 @@ export const TournamentService = {
     const mIndex = matches.findIndex((m) => m.id === matchId);
     if (mIndex === -1) return null;
 
+    // Capture the ORIGINAL winnerId before applying payload, needed for revert logic
+    const originalWinnerId = matches[mIndex].winnerId;
     let currentMatch = { ...matches[mIndex], ...payload };
 
     // Auto-detect match winner if scores dictate it
@@ -337,13 +340,13 @@ export const TournamentService = {
         }
       }
     } else if (currentMatch.status !== 'FINISHED' && currentMatch.nextMatchId && currentMatch.nextMatchSlot) {
-      // If match was reverted back from FINISHED to LIVE/UPCOMING, clear advancement in subsequent match
+      // If match was reverted from FINISHED, clear advancement using the ORIGINAL winnerId
       const nextIndex = matches.findIndex((m) => m.id === currentMatch.nextMatchId);
-      if (nextIndex !== -1) {
+      if (nextIndex !== -1 && originalWinnerId) {
         const nextMatch = { ...matches[nextIndex] };
-        if (currentMatch.nextMatchSlot === 1 && nextMatch.participant1?.id === currentMatch.winnerId) {
+        if (currentMatch.nextMatchSlot === 1 && nextMatch.participant1?.id === originalWinnerId) {
           nextMatch.participant1 = null;
-        } else if (currentMatch.nextMatchSlot === 2 && nextMatch.participant2?.id === currentMatch.winnerId) {
+        } else if (currentMatch.nextMatchSlot === 2 && nextMatch.participant2?.id === originalWinnerId) {
           nextMatch.participant2 = null;
         }
         matches[nextIndex] = nextMatch;
@@ -353,103 +356,26 @@ export const TournamentService = {
     // If tournament is TWO_STAGE and match was in group stage, recalculate group standings
     if (tournament.format?.startsWith('TWO_STAGE') && currentMatch.phase === 'GROUP') {
       const groupMatches = matches.filter((m) => m.phase === 'GROUP');
-      const updatedParticipants = tournament.participants.map((p) => {
-        const participantMatches = groupMatches.filter(
-          (m) =>
-            (m.participant1?.id === p.id || m.participant2?.id === p.id) &&
-            m.status === 'FINISHED'
-        );
-
-        let wins = 0;
-        let losses = 0;
-        let setsWon = 0;
-        let setsLost = 0;
-        let pointsWon = 0;
-        let pointsLost = 0;
-
-        participantMatches.forEach((m) => {
-          if (m.winnerId === p.id) {
-            wins += 1;
-          } else if (m.winnerId) {
-            losses += 1;
-          }
-
-          m.scores.forEach((s) => {
-            const isP1 = m.participant1?.id === p.id;
-            const myScore = isP1 ? s.score1 : s.score2;
-            const oppScore = isP1 ? s.score2 : s.score1;
-
-            if (myScore > 0 || oppScore > 0) {
-              pointsWon += myScore;
-              pointsLost += oppScore;
-              if (myScore > oppScore) setsWon += 1;
-              else if (oppScore > myScore) setsLost += 1;
-            }
-          });
-        });
-
-        // Simple scoring: Menang +1, Kalah +0
-        const points = wins * 1;
-        const setDiff = setsWon - setsLost;
-        const pointDiff = pointsWon - pointsLost;
-
-        return {
-          ...p,
-          groupWins: wins,
-          groupLosses: losses,
-          groupPoints: points,
-          groupSetsWon: setsWon,
-          groupSetsLost: setsLost,
-          groupSetDiff: setDiff,
-          groupPointsWon: pointsWon,
-          groupPointsLost: pointsLost,
-          groupPointDiff: pointDiff,
-        };
-      });
-
-      // Assign group ranks using tiebreaker
       const groups = ['Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'];
-      groups.forEach((gName) => {
-        const inGroup = updatedParticipants.filter((p) => p.group === gName);
-        inGroup.sort((a, b) => {
-          // 1. Match Win Points (PTS: +1 per win)
-          if ((b.groupPoints || 0) !== (a.groupPoints || 0)) {
-            return (b.groupPoints || 0) - (a.groupPoints || 0);
-          }
-          // 2. Set Difference (SD)
-          const setDiffA = a.groupSetDiff ?? 0;
-          const setDiffB = b.groupSetDiff ?? 0;
-          if (setDiffB !== setDiffA) {
-            return setDiffB - setDiffA;
-          }
-          // 3. Point Difference (PD)
-          const ptDiffA = a.groupPointDiff ?? 0;
-          const ptDiffB = b.groupPointDiff ?? 0;
-          if (ptDiffB !== ptDiffA) {
-            return ptDiffB - ptDiffA;
-          }
-          // 4. Points Won (PW)
-          const ptsWonA = a.groupPointsWon ?? 0;
-          const ptsWonB = b.groupPointsWon ?? 0;
-          if (ptsWonB !== ptsWonA) {
-            return ptsWonB - ptsWonA;
-          }
-          // 5. Seed
-          return (a.seed || 999) - (b.seed || 999);
-        });
+      const updatedParticipants: Participant[] = [];
 
-        inGroup.forEach((p, idx) => {
-          p.groupRank = idx + 1;
-        });
+      groups.forEach((gName) => {
+        const inGroup = tournament.participants.filter((p) => p.group === gName);
+        const inGroupMatches = groupMatches.filter(
+          (m) => m.groupName === gName || m.roundName?.includes(gName)
+        );
+        const ranked = calculateGroupStandings(inGroup, inGroupMatches);
+        updatedParticipants.push(...ranked);
       });
 
-      tournament.participants = updatedParticipants;
+      const others = tournament.participants.filter((p) => !p.group || !groups.includes(p.group));
+      tournament.participants = [...updatedParticipants, ...others];
     }
 
     tournament.matches = matches;
 
     // Also update tournament status if all matches finished
-    const allFinished = matches.every((m) => m.status === 'FINISHED');
+    const allFinished = matches.every((m) => m.status === 'FINISHED' || m.status === 'WALKOVER');
     if (allFinished) {
       tournament.status = 'COMPLETED';
     } else if (matches.some((m) => m.status === 'LIVE')) {

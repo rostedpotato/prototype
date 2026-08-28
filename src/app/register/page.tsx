@@ -45,8 +45,24 @@ export default function GlobalRegisterPage() {
       return;
     }
 
-    if (!formData.tournamentId || !formData.teamName || !formData.player1Name || !formData.whatsapp) {
-      setError('Mohon lengkapi data yang wajib diisi');
+    // Simple sanitizer to remove dangerous characters like <, > to prevent XSS payloads in DB
+    const sanitize = (str: string) => str.replace(/[<>]/g, '').trim();
+
+    const teamNameStr = sanitize(formData.teamName);
+    const p1NameStr = sanitize(formData.player1Name);
+    const p2NameStr = sanitize(formData.player2Name);
+    const reclub1Str = sanitize(formData.reclubId1);
+    const reclub2Str = sanitize(formData.reclubId2);
+    const whatsappStr = sanitize(formData.whatsapp);
+
+    if (!formData.tournamentId || !teamNameStr || !p1NameStr || !whatsappStr) {
+      setError('Mohon lengkapi data yang wajib diisi dengan benar');
+      return;
+    }
+
+    // Phone validation: must be digits, start with 0, min 10 digits
+    if (!/^0\d{9,}$/.test(whatsappStr)) {
+      setError('Nomor telepon harus berupa angka, dimulai dengan angka 0, dan minimal 10 digit.');
       return;
     }
 
@@ -60,14 +76,29 @@ export default function GlobalRegisterPage() {
          return;
       }
 
+      // Check for unique team name
+      const isTeamNameTaken = 
+        selectedTournament.registrations?.some(
+          r => r.teamName.toLowerCase() === teamNameStr.toLowerCase() && r.status !== 'REJECTED'
+        ) || 
+        selectedTournament.participants.some(
+          p => p.name.toLowerCase() === teamNameStr.toLowerCase()
+        );
+
+      if (isTeamNameTaken) {
+        setError('Nama tim sudah digunakan oleh pendaftar lain. Mohon gunakan nama tim yang berbeda.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const success = service.submitRegistration(formData.tournamentId, {
         sector: selectedTournament.categoryLabel, // We store the category label as sector
-        teamName: formData.teamName,
-        player1Name: formData.player1Name,
-        player2Name: formData.player2Name,
-        reclubId1: formData.reclubId1,
-        reclubId2: formData.reclubId2,
-        whatsapp: formData.whatsapp
+        teamName: teamNameStr,
+        player1Name: p1NameStr,
+        player2Name: p2NameStr,
+        reclubId1: reclub1Str,
+        reclubId2: reclub2Str,
+        whatsapp: whatsappStr
       });
 
       if (success) {
@@ -163,6 +194,8 @@ export default function GlobalRegisterPage() {
                   value={formData.teamName}
                   onChange={handleChange}
                   required
+                  minLength={2}
+                  maxLength={50}
                   placeholder="Mis. The Smashers"
                   className="w-full px-3 py-2 bg-white text-neutral-900 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
@@ -180,6 +213,8 @@ export default function GlobalRegisterPage() {
                     value={formData.player1Name}
                     onChange={handleChange}
                     required
+                    minLength={2}
+                    maxLength={50}
                     className="w-full px-3 py-2 bg-white text-neutral-900 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                 </div>
@@ -193,6 +228,7 @@ export default function GlobalRegisterPage() {
                     name="reclubId1"
                     value={formData.reclubId1}
                     onChange={handleChange}
+                    maxLength={30}
                     className="w-full px-3 py-2 bg-white text-neutral-900 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                 </div>
@@ -209,6 +245,7 @@ export default function GlobalRegisterPage() {
                     name="player2Name"
                     value={formData.player2Name}
                     onChange={handleChange}
+                    maxLength={50}
                     className="w-full px-3 py-2 bg-white text-neutral-900 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                 </div>
@@ -222,6 +259,7 @@ export default function GlobalRegisterPage() {
                     name="reclubId2"
                     value={formData.reclubId2}
                     onChange={handleChange}
+                    maxLength={30}
                     className="w-full px-3 py-2 bg-white text-neutral-900 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                 </div>
@@ -238,7 +276,9 @@ export default function GlobalRegisterPage() {
                   value={formData.whatsapp}
                   onChange={handleChange}
                   required
-                  placeholder="081234567890"
+                  pattern="^0[0-9]{9,}$"
+                  title="Nomor telepon harus berupa angka, dimulai dengan 0, dan minimal 10 digit"
+                  placeholder="Mis. 081234567890"
                   className="w-full px-3 py-2 bg-white text-neutral-900 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>

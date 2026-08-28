@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Match, SetScore, MatchStatus, SportType } from '@/types/tournament';
+import { Match, SetScore, MatchStatus, SportType, Participant } from '@/types/tournament';
 import { TournamentService, useTournament } from '@/lib/tournamentStore';
 import { useAdminAuth } from '@/lib/authStore';
 import {
   checkSetStatus,
-  canIncrementScore,
   calculateMatchWinner,
   getSetsToWinForRound,
   getMaxSetsForRound,
@@ -19,17 +18,88 @@ import {
   Trophy,
   CheckCircle2,
   CircleDot,
-  AlertTriangle,
   Users,
   Sparkles,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
+interface TeamScoreBoxProps {
+  participant?: Participant | null;
+  fallbackLabel: string;
+  servingSide: 1 | 2;
+  teamNumber: 1 | 2;
+  score: number;
+  onSetServing: (team: 1 | 2) => void;
+  onScoreChange: (team: 1 | 2, delta: number) => void;
+  onDirectScoreSet: (team: 1 | 2, val: number) => void;
+}
+
+function TeamScoreBox({
+  participant,
+  fallbackLabel,
+  servingSide,
+  teamNumber,
+  score,
+  onSetServing,
+  onScoreChange,
+  onDirectScoreSet,
+}: TeamScoreBoxProps) {
+  const isServing = servingSide === teamNumber;
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex flex-col items-center text-center">
+      <div className="w-full mb-1.5">
+        <span className="text-xs font-black text-slate-100 line-clamp-1">
+          {participant?.name || fallbackLabel}
+        </span>
+        <button
+          type="button"
+          onClick={() => onSetServing(teamNumber)}
+          className={`mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 mx-auto transition-colors ${
+            isServing
+              ? 'bg-lime-500 text-slate-950 shadow-sm shadow-lime-500/50'
+              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+          }`}
+        >
+          <CircleDot className="w-2.5 h-2.5" />
+          {isServing ? 'Servis' : 'Set Servis'}
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 my-1">
+        <button
+          type="button"
+          onClick={() => onScoreChange(teamNumber, -1)}
+          disabled={score === 0}
+          className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 disabled:opacity-30 border border-slate-700 flex items-center justify-center active:scale-95 transition-all text-lg font-bold"
+        >
+          <Minus className="w-4 h-4" />
+        </button>
+
+        <input
+          type="number"
+          min="0"
+          value={score}
+          onChange={(e) => onDirectScoreSet(teamNumber, parseInt(e.target.value) || 0)}
+          className="w-16 h-14 rounded-2xl bg-slate-950 border-2 border-slate-700 text-center text-3xl font-black font-score text-white focus:outline-none focus:border-lime-400 shadow-inner"
+        />
+
+        <button
+          type="button"
+          onClick={() => onScoreChange(teamNumber, 1)}
+          className="w-9 h-9 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-md shadow-lime-500/20 active:scale-95 transition-all"
+        >
+          <Plus className="w-4 h-4 stroke-[3]" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface AdminScoringModalProps {
   tournamentId: string;
   match: Match | null;
   sport: SportType;
-  pointsPerSet: number;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -56,7 +126,6 @@ export default function AdminScoringModal({
   const [court, setCourt] = useState<string>('');
   const [referee, setReferee] = useState<string>('');
   const [scheduledTime, setScheduledTime] = useState<string>('');
-  const [ruleNotice, setRuleNotice] = useState<string | null>(null);
 
   // Manual participant selector state
   const [p1Id, setP1Id] = useState<string>('');
@@ -66,8 +135,8 @@ export default function AdminScoringModal({
     if (match) {
       setActiveSet(match.currentSet || 1);
       const loadedScores: SetScore[] = match.scores && match.scores.length > 0 
-        ? JSON.parse(JSON.stringify(match.scores)) 
-        : [];
+        ? match.scores.map(s => ({ ...s })) 
+        : Array.from({ length: maxSets }, (_, i) => ({ setNumber: i + 1, score1: 0, score2: 0 }));
       
       while (loadedScores.length < maxSets) {
         loadedScores.push({ setNumber: loadedScores.length + 1, score1: 0, score2: 0 });
@@ -81,7 +150,6 @@ export default function AdminScoringModal({
       setScheduledTime(match.scheduledTime || '09:00 WIB');
       setP1Id(match.participant1?.id || '');
       setP2Id(match.participant2?.id || '');
-      setRuleNotice(null);
     }
   }, [match, maxSets]);
 
@@ -98,8 +166,6 @@ export default function AdminScoringModal({
   const p2 = tournament.participants.find((p) => p.id === p2Id) || match.participant2;
 
   const handleScoreChange = (team: 1 | 2, delta: number) => {
-    setRuleNotice(null);
-
     const newScores = scores.map((s) => {
       if (s.setNumber === activeSet) {
         const currentVal = team === 1 ? s.score1 : s.score2;
@@ -127,7 +193,6 @@ export default function AdminScoringModal({
   };
 
   const handleDirectScoreSet = (score1Val: number, score2Val: number) => {
-    setRuleNotice(null);
     const newScores = scores.map((s) => {
       if (s.setNumber === activeSet) {
         return {
@@ -180,14 +245,13 @@ export default function AdminScoringModal({
           spread: 70,
           origin: { y: 0.6 },
         });
-      } catch (e) {}
+      } catch (e) {
+        console.error('Confetti error', e);
+      }
     }
 
     onClose();
   };
-
-  const canIncTeam1 = canIncrementScore(sport, currentSetScore.score1, currentSetScore.score2, 1, targetGames).allowed;
-  const canIncTeam2 = canIncrementScore(sport, currentSetScore.score1, currentSetScore.score2, 2, targetGames).allowed;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
@@ -467,103 +531,30 @@ export default function AdminScoringModal({
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              {/* Team 1 Box */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex flex-col items-center text-center">
-                <div className="w-full mb-1.5">
-                  <span className="text-xs font-black text-slate-100 line-clamp-1">
-                    {p1?.name || 'Peserta 1'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setServingSide(1)}
-                    className={`mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 mx-auto transition-colors ${
-                      servingSide === 1
-                        ? 'bg-lime-500 text-slate-950 shadow-sm shadow-lime-500/50'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                    }`}
-                  >
-                    <CircleDot className="w-2.5 h-2.5" />
-                    {servingSide === 1 ? 'Servis' : 'Set Servis'}
-                  </button>
-                </div>
-
-                {/* Score Stepper & Direct Input */}
-                <div className="flex items-center gap-2 my-1">
-                  <button
-                    type="button"
-                    onClick={() => handleScoreChange(1, -1)}
-                    disabled={currentSetScore.score1 === 0}
-                    className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 disabled:opacity-30 border border-slate-700 flex items-center justify-center active:scale-95 transition-all text-lg font-bold"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-
-                  <input
-                    type="number"
-                    min="0"
-                    value={currentSetScore.score1}
-                    onChange={(e) => handleDirectScoreSet(parseInt(e.target.value) || 0, currentSetScore.score2)}
-                    className="w-16 h-14 rounded-2xl bg-slate-950 border-2 border-slate-700 text-center text-3xl font-black font-score text-white focus:outline-none focus:border-lime-400 shadow-inner"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => handleScoreChange(1, 1)}
-                    className="w-9 h-9 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-md shadow-lime-500/20 active:scale-95 transition-all"
-                  >
-                    <Plus className="w-4 h-4 stroke-[3]" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Team 2 Box */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex flex-col items-center text-center">
-                <div className="w-full mb-1.5">
-                  <span className="text-xs font-black text-slate-100 line-clamp-1">
-                    {p2?.name || 'Peserta 2'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setServingSide(2)}
-                    className={`mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 mx-auto transition-colors ${
-                      servingSide === 2
-                        ? 'bg-lime-500 text-slate-950 shadow-sm shadow-lime-500/50'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                    }`}
-                  >
-                    <CircleDot className="w-2.5 h-2.5" />
-                    {servingSide === 2 ? 'Servis' : 'Set Servis'}
-                  </button>
-                </div>
-
-                {/* Score Stepper & Direct Input */}
-                <div className="flex items-center gap-2 my-1">
-                  <button
-                    type="button"
-                    onClick={() => handleScoreChange(2, -1)}
-                    disabled={currentSetScore.score2 === 0}
-                    className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 disabled:opacity-30 border border-slate-700 flex items-center justify-center active:scale-95 transition-all text-lg font-bold"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-
-                  <input
-                    type="number"
-                    min="0"
-                    value={currentSetScore.score2}
-                    onChange={(e) => handleDirectScoreSet(currentSetScore.score1, parseInt(e.target.value) || 0)}
-                    className="w-16 h-14 rounded-2xl bg-slate-950 border-2 border-slate-700 text-center text-3xl font-black font-score text-white focus:outline-none focus:border-lime-400 shadow-inner"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => handleScoreChange(2, 1)}
-                    className="w-9 h-9 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-md shadow-lime-500/20 active:scale-95 transition-all"
-                  >
-                    <Plus className="w-4 h-4 stroke-[3]" />
-                  </button>
-                </div>
-              </div>
+              <TeamScoreBox
+                participant={p1}
+                fallbackLabel="Peserta 1"
+                servingSide={servingSide}
+                teamNumber={1}
+                score={currentSetScore.score1}
+                onSetServing={setServingSide}
+                onScoreChange={handleScoreChange}
+                onDirectScoreSet={(team, val) =>
+                  handleDirectScoreSet(val, currentSetScore.score2)
+                }
+              />
+              <TeamScoreBox
+                participant={p2}
+                fallbackLabel="Peserta 2"
+                servingSide={servingSide}
+                teamNumber={2}
+                score={currentSetScore.score2}
+                onSetServing={setServingSide}
+                onScoreChange={handleScoreChange}
+                onDirectScoreSet={(team, val) =>
+                  handleDirectScoreSet(currentSetScore.score1, val)
+                }
+              />
             </div>
 
             {/* Quick Set Presets for Wasit/Admin */}
@@ -574,7 +565,7 @@ export default function AdminScoringModal({
               <div className="flex flex-wrap gap-1.5">
                 {[
                   [6, 0], [6, 1], [6, 2], [6, 3], [6, 4], [7, 5], [7, 6],
-                  [0, 6], [1, 6], [2, 6], [3, 6], [4, 6], [5, 7], [6, 7]
+                  [0, 6], [1, 6], [2, 6], [3, 6], [4, 6], [5, 7], [6, 7],
                 ].map(([s1, s2]) => (
                   <button
                     key={`${s1}-${s2}`}

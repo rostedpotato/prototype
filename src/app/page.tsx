@@ -280,7 +280,6 @@ export default function HomePage() {
           tournamentId={scoringModalMatch.tournamentId}
           match={scoringModalMatch.match}
           sport={scoringModalMatch.sport}
-          pointsPerSet={scoringModalMatch.pointsPerSet}
           isOpen={true}
           onClose={() => setScoringModalMatch(null)}
         />

@@ -1,15 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { Tournament, Match, Participant } from '@/types/tournament';
+import { Tournament, Match } from '@/types/tournament';
 import { useAdminAuth } from '@/lib/authStore';
 import { TournamentService } from '@/lib/tournamentStore';
+import { calculateGroupStandings, getMatchSetsSummary, getActiveSets } from '@/lib/standingUtils';
 import {
   Trophy,
   Shield,
   Medal,
   SlidersHorizontal,
-  ArrowRight,
   Sparkles,
   CheckCircle2,
   Users,
@@ -28,7 +28,6 @@ export default function GroupStageViewer({
 }: GroupStageViewerProps) {
   const { isAdmin } = useAdminAuth();
   const [selectedGroupTab, setSelectedGroupTab] = useState<string>('ALL');
-  const [isGenerating, setIsGenerating] = useState(false);
 
   const groups = ['Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'];
 
@@ -41,9 +40,7 @@ export default function GroupStageViewer({
         'Kunci klasemen grup sekarang dan buat 2 Bagan Knockout (Upper Bracket & Beginner Bracket)?'
       )
     ) {
-      setIsGenerating(true);
       TournamentService.generateKnockoutForTwoStage(tournament.id);
-      setIsGenerating(false);
     }
   };
 
@@ -80,7 +77,6 @@ export default function GroupStageViewer({
                 <div className="space-y-1.5 text-right">
                   <button
                     onClick={handleGenerateKnockout}
-                    disabled={isGenerating}
                     className={`px-5 py-3 rounded-2xl text-white font-black text-xs shadow-lg transition-all flex items-center gap-2 ${
                       groupMatches.length > 0 && groupMatches.every((m) => m.status === 'FINISHED')
                         ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/30 ring-2 ring-emerald-400 animate-pulse'
@@ -151,71 +147,11 @@ export default function GroupStageViewer({
               (p) => p.group === groupName
             );
 
-            const groupMatches = tournament.matches.filter(
+            const inGroupMatches = tournament.matches.filter(
               (m) => m.phase === 'GROUP' && (m.groupName === groupName || m.roundName?.includes(groupName))
             );
 
-            const sortedStandings = rawParticipants
-              .map((p) => {
-                const finishedMatches = groupMatches.filter(
-                  (m) =>
-                    (m.participant1?.id === p.id || m.participant2?.id === p.id) &&
-                    m.status === 'FINISHED'
-                );
-
-                let wins = 0;
-                let losses = 0;
-                let setsWon = 0;
-                let setsLost = 0;
-                let pointsWon = 0;
-                let pointsLost = 0;
-
-                finishedMatches.forEach((m) => {
-                  if (m.winnerId === p.id) {
-                    wins += 1;
-                  } else if (m.winnerId) {
-                    losses += 1;
-                  }
-
-                  m.scores.forEach((s) => {
-                    const isP1 = m.participant1?.id === p.id;
-                    const myScore = isP1 ? s.score1 : s.score2;
-                    const oppScore = isP1 ? s.score2 : s.score1;
-
-                    if (myScore > 0 || oppScore > 0) {
-                      pointsWon += myScore;
-                      pointsLost += oppScore;
-                      if (myScore > oppScore) setsWon += 1;
-                      else if (oppScore > myScore) setsLost += 1;
-                    }
-                  });
-                });
-
-                const points = wins * 1;
-                const setDiff = setsWon - setsLost;
-                const pointDiff = pointsWon - pointsLost;
-
-                return {
-                  ...p,
-                  played: finishedMatches.length,
-                  groupWins: wins,
-                  groupLosses: losses,
-                  groupPoints: points,
-                  setsWon,
-                  setsLost,
-                  setDiff,
-                  pointsWon,
-                  pointsLost,
-                  pointDiff,
-                };
-              })
-              .sort((a, b) => {
-                if (b.groupPoints !== a.groupPoints) return b.groupPoints - a.groupPoints;
-                if (b.setDiff !== a.setDiff) return b.setDiff - a.setDiff;
-                if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
-                if (b.pointsWon !== a.pointsWon) return b.pointsWon - a.pointsWon;
-                return (a.seed || 999) - (b.seed || 999);
-              });
+            const sortedStandings = calculateGroupStandings(rawParticipants, inGroupMatches);
 
             const colorThemes = [
               { header: 'from-blue-600/30 to-blue-900/20' },
@@ -268,10 +204,10 @@ export default function GroupStageViewer({
                             <td className="py-3 px-1.5 text-center text-emerald-400 font-bold">{p.groupWins}</td>
                             <td className="py-3 px-1.5 text-center text-rose-400 font-bold">{p.groupLosses}</td>
                             <td className="py-3 px-2 text-center text-slate-300 font-score font-bold">
-                              {p.setsWon}-{p.setsLost} <span className="text-[10px] text-slate-500">({p.setDiff > 0 ? `+${p.setDiff}` : p.setDiff})</span>
+                              {p.groupSetsWon}-{p.groupSetsLost} <span className="text-[10px] text-slate-500">({(p.groupSetDiff ?? 0) > 0 ? `+${p.groupSetDiff}` : p.groupSetDiff})</span>
                             </td>
                             <td className="py-3 px-2 text-center text-slate-300 font-score font-bold">
-                              {p.pointsWon}-{p.pointsLost} <span className="text-[10px] text-slate-500">({p.pointDiff > 0 ? `+${p.pointDiff}` : p.pointDiff})</span>
+                              {p.groupPointsWon}-{p.groupPointsLost} <span className="text-[10px] text-slate-500">({(p.groupPointDiff ?? 0) > 0 ? `+${p.groupPointDiff}` : p.groupPointDiff})</span>
                             </td>
                             <td className="py-3 px-2.5 text-center font-black font-score text-lime-400 text-sm">{p.groupPoints}</td>
                             <td className="py-3 px-3 text-right">
@@ -328,15 +264,8 @@ export default function GroupStageViewer({
             .map((match) => {
               const isFinished = match.status === 'FINISHED';
               const isLive = match.status === 'LIVE';
-              let setsWon1 = 0;
-              let setsWon2 = 0;
-              match.scores.forEach((s) => {
-                if (s.score1 > 0 || s.score2 > 0) {
-                  if (s.score1 > s.score2) setsWon1++;
-                  else if (s.score2 > s.score1) setsWon2++;
-                }
-              });
-              const activeScores = match.scores.filter((s) => s.score1 > 0 || s.score2 > 0);
+              const { setsWon1, setsWon2 } = getMatchSetsSummary(match.scores);
+              const activeScores = getActiveSets(match.scores);
 
               return (
                 <div
