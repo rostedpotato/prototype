@@ -284,6 +284,16 @@ export default function GlobalRegisterPage() {
               </div>
 
               <div className="pt-4 border-t border-neutral-200">
+                <div className="mb-4">
+                  <span className="block text-sm font-medium text-neutral-700 mb-2">Syarat & Ketentuan</span>
+                  <div className="w-full rounded-lg border border-neutral-200 overflow-hidden bg-neutral-100 flex items-center justify-center p-2">
+                    <img 
+                      src="/term-and-con.jpeg" 
+                      alt="Syarat dan Ketentuan" 
+                      className="max-w-full max-h-[500px] object-contain rounded" 
+                    />
+                  </div>
+                </div>
                 <label className="flex items-start">
                   <input
                     type="checkbox"
@@ -293,7 +303,7 @@ export default function GlobalRegisterPage() {
                     className="mt-1 h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-neutral-300 rounded"
                   />
                   <span className="ml-2 text-sm text-neutral-600">
-                    Saya menyetujui Syarat & Ketentuan yang berlaku untuk turnamen ini. Data yang diisi adalah benar dan dapat dipertanggungjawabkan.
+                    Saya telah membaca dan menyetujui Syarat & Ketentuan di atas. Data yang diisi adalah benar dan dapat dipertanggungjawabkan.
                   </span>
                 </label>
               </div>
