@@ -108,6 +108,9 @@ export interface Tournament {
   // For Two-Stage Tournament
   format?: TournamentFormat; // 'KNOCKOUT' or 'TWO_STAGE'
   groupStageCompleted?: boolean; // Whether group stage is finished
+  groupScheduleScheme?: GroupScheduleScheme; // 'SPLIT_WAVE' (2 Gelombang) or 'ROLLING_ROUND' (Putaran Bergulir)
   registrations?: RegistrationRequest[]; // Pending/Approved/Rejected registrations
   createdAt: string;
 }
+
+export type GroupScheduleScheme = 'SPLIT_WAVE' | 'ROLLING_ROUND';

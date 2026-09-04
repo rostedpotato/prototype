@@ -261,6 +261,7 @@ export default function GroupStageViewer({
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {tournament.matches
             .filter((m) => m.phase === 'GROUP' && (selectedGroupTab === 'ALL' || m.groupName === selectedGroupTab || m.roundName?.includes(selectedGroupTab)))
+            .sort((a, b) => (a.matchOrder || 0) - (b.matchOrder || 0))
             .map((match) => {
               const isFinished = match.status === 'FINISHED';
               const isLive = match.status === 'LIVE';

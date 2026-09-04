@@ -8,8 +8,9 @@ import { useAdminAuth } from '@/lib/authStore';
 import BracketViewer from '@/components/BracketViewer';
 import AdminScoringModal from '@/components/AdminScoringModal';
 import GroupStageViewer from '@/components/GroupStageViewer';
-import { generateGroupStageMatches } from '@/lib/bracketGenerator';
-import { Match } from '@/types/tournament';
+import ScheduleConfigModal from '@/components/ScheduleConfigModal';
+import { generateGroupStageMatches, applyGroupStageSchedule } from '@/lib/bracketGenerator';
+import { Match, GroupScheduleScheme } from '@/types/tournament';
 import {
   ArrowLeft,
   Trophy,
@@ -20,6 +21,8 @@ import {
   MapPin,
   Lock,
   Shield,
+  Sparkles,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function AdminTournamentManagePage() {
@@ -31,6 +34,8 @@ export default function AdminTournamentManagePage() {
 
   const [activeTab, setActiveTab] = useState<'GROUP' | 'BRACKET' | 'MATCHES' | 'VERIFICATION'>('BRACKET');
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+  const [isScheduleConfigOpen, setIsScheduleConfigOpen] = useState(false);
+  const [scheduleConfigMode, setScheduleConfigMode] = useState<'GENERATE' | 'RESCHEDULE'>('GENERATE');
 
   // Auto set to GROUP tab if TWO_STAGE and not yet group stage completed
   useEffect(() => {
@@ -81,6 +86,64 @@ export default function AdminTournamentManagePage() {
     updates: { court?: string; scheduledTime?: string; referee?: string }
   ) => {
     service.updateMatch(tournament.id, matchId, updates);
+  };
+
+  const handleScheduleConfigConfirm = (config: {
+    scheme: GroupScheduleScheme;
+    startTime: string;
+    slotDurationMinutes: number;
+  }) => {
+    if (!tournament) return;
+    const courts =
+      tournament.courts && tournament.courts.length > 0
+        ? tournament.courts
+        : ['Court 1', 'Court 2', 'Court 3'];
+
+    if (scheduleConfigMode === 'GENERATE') {
+      const approvedRegs = (tournament.registrations || []).filter(
+        (r) => r.status === 'APPROVED'
+      );
+      const freshParticipants = approvedRegs.map((reg) => ({
+        id: crypto.randomUUID(),
+        name: reg.teamName,
+        player1: reg.player1Name,
+        player2: reg.player2Name,
+        reclubId1: reg.reclubId1,
+        reclubId2: reg.reclubId2,
+        whatsapp: reg.whatsapp,
+        club: reg.sector,
+        registrationId: reg.id,
+      }));
+
+      const result = generateGroupStageMatches(
+        tournament.id,
+        freshParticipants,
+        courts,
+        config.scheme,
+        config.startTime,
+        config.slotDurationMinutes
+      );
+
+      service.update(tournament.id, {
+        participants: result.groupedParticipants,
+        matches: result.matches,
+        groupScheduleScheme: config.scheme,
+      });
+    } else {
+      // Mode RESCHEDULE: re-apply court, time, referee, matchOrder
+      const updatedMatches = applyGroupStageSchedule(
+        tournament.matches,
+        courts,
+        config.scheme,
+        config.startTime,
+        config.slotDurationMinutes
+      );
+
+      service.update(tournament.id, {
+        matches: updatedMatches,
+        groupScheduleScheme: config.scheme,
+      });
+    }
   };
 
   return (
@@ -219,42 +282,24 @@ export default function AdminTournamentManagePage() {
             
             if (tournament.matches.length === 0 && approvedCount === 16) {
               return (
-                <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-2xl flex items-center justify-between">
-                  <div className="text-sm text-blue-300">
-                    16 Peserta telah disetujui. Silakan acak peserta ke dalam 4 grup untuk memulai fase grup.
+                <div className="p-5 bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-slate-900 border border-blue-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-blue-300 font-bold text-sm">
+                      <Sparkles className="w-4 h-4 text-blue-400" />
+                      <span>16 Pasang Peserta Siap Diundi ke 4 Grup</span>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Pilih skema penjadwalan (Opsi 1: 2 Gelombang atau Opsi 2: Putaran Bergulir) sebelum jadwal dibuat.
+                    </p>
                   </div>
                   <button
                     onClick={() => {
-                      if (confirm('Acak 16 peserta ini ke dalam 4 Grup sekarang?')) {
-                        // Build fresh participants list from APPROVED registrations
-                        const approvedRegs = (tournament.registrations || []).filter(r => r.status === 'APPROVED');
-                        const freshParticipants = approvedRegs.map(reg => ({
-                          id: crypto.randomUUID(),
-                          name: reg.teamName,
-                          player1: reg.player1Name,
-                          player2: reg.player2Name,
-                          reclubId1: reg.reclubId1,
-                          reclubId2: reg.reclubId2,
-                          whatsapp: reg.whatsapp,
-                          club: reg.sector,
-                          registrationId: reg.id,
-                        }));
-
-                        const courts = tournament.courts.length > 0 ? tournament.courts : ['Court 1', 'Court 2', 'Court 3', 'Court 4'];
-                        const result = generateGroupStageMatches(
-                          tournament.id,
-                          freshParticipants,
-                          courts
-                        );
-                        service.update(tournament.id, {
-                          participants: result.groupedParticipants,
-                          matches: result.matches
-                        });
-                      }
+                      setScheduleConfigMode('GENERATE');
+                      setIsScheduleConfigOpen(true);
                     }}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl whitespace-nowrap"
+                    className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white text-xs font-black rounded-xl whitespace-nowrap shadow-lg shadow-blue-500/20 flex items-center gap-2"
                   >
-                    🎲 Acak & Generate Grup
+                    <span>🎲 Acak & Pilih Skema Jadwal</span>
                   </button>
                 </div>
               );
@@ -272,10 +317,36 @@ export default function AdminTournamentManagePage() {
           })()}
           
           {tournament.matches.length > 0 && (
-            <GroupStageViewer
-              tournament={tournament}
-              onOpenScoreControl={(m) => setSelectedMatch(m)}
-            />
+            <>
+              {/* Quick Re-schedule Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-900/90 border border-slate-800 rounded-2xl">
+                <div className="flex items-center gap-2 text-xs flex-wrap">
+                  <span className="px-2.5 py-1 rounded-lg bg-lime-500/10 text-lime-300 font-bold border border-lime-500/30 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5" />
+                    Skema: {tournament.groupScheduleScheme === 'ROLLING_ROUND' ? 'Opsi 2 (Putaran Bergulir)' : 'Opsi 1 (2 Gelombang / Split Wave)'}
+                  </span>
+                  <span className="text-slate-400 text-[11px]">
+                    Jika ada kendala/perubahan mendadak di lapangan, jadwal dapat ditata ulang otomatis kapan saja.
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setScheduleConfigMode('RESCHEDULE');
+                    setIsScheduleConfigOpen(true);
+                  }}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-amber-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-md whitespace-nowrap"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                  <span>⚙️ Sesuaikan Jadwal (Opsi 1 / Opsi 2)</span>
+                </button>
+              </div>
+
+              <GroupStageViewer
+                tournament={tournament}
+                onOpenScoreControl={(m) => setSelectedMatch(m)}
+              />
+            </>
           )}
         </div>
       )}
@@ -329,9 +400,23 @@ export default function AdminTournamentManagePage() {
                   Atur lapangan, jam main, dan wasit ({refereeOptions.length} wasit tersedia sesuai {courtOptions.length} lapangan) via dropdown.
                 </p>
               </div>
-              <span className="text-xs text-slate-400 bg-slate-800/80 px-3 py-1 rounded-xl border border-slate-700 w-fit">
-                Total {tournament.matches.length} Match
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {tournament.format?.startsWith('TWO_STAGE') && tournament.matches.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setScheduleConfigMode('RESCHEDULE');
+                      setIsScheduleConfigOpen(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-amber-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-md"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                    <span>⚙️ Sesuaikan Jadwal Otomatis</span>
+                  </button>
+                )}
+                <span className="text-xs text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700 w-fit">
+                  Total {tournament.matches.length} Match
+                </span>
+              </div>
             </div>
 
             <div className="divide-y divide-slate-800/80">
@@ -557,6 +642,17 @@ export default function AdminTournamentManagePage() {
           sport={tournament.sport}
           isOpen={true}
           onClose={() => setSelectedMatch(null)}
+        />
+      )}
+
+      {/* Schedule Config Modal (Opsi 1 / Opsi 2) */}
+      {tournament && (
+        <ScheduleConfigModal
+          isOpen={isScheduleConfigOpen}
+          onClose={() => setIsScheduleConfigOpen(false)}
+          tournament={tournament}
+          mode={scheduleConfigMode}
+          onConfirm={handleScheduleConfigConfirm}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import { Match, Participant, TournamentCategory } from '@/types/tournament';
+import { Match, Participant, TournamentCategory, GroupScheduleScheme } from '@/types/tournament';
 
 export function getRoundName(totalRounds: number, currentRound: number): string {
   const roundFromFinal = totalRounds - currentRound;
@@ -117,16 +117,153 @@ export function generateBracketMatches(
 
 /**
  * Generate Group Stage matches for Two-Stage Tournament
+/**
+ * Calculates slot time given start time string (e.g. "08:00 WIB"), slot index, and duration
+ */
+export function calculateSlotTime(
+  startTimeStr: string = '08:00 WIB',
+  slotIndex: number,
+  slotDurationMinutes: number = 45
+): string {
+  const clean = (startTimeStr || '08:00').replace(/[^0-9:]/g, '');
+  const [hStr, mStr] = clean.split(':');
+  const startHour = parseInt(hStr || '8', 10);
+  const startMin = parseInt(mStr || '0', 10);
+
+  const totalMin = startHour * 60 + startMin + slotIndex * slotDurationMinutes;
+  const h = Math.floor(totalMin / 60) % 24;
+  const m = totalMin % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} WIB`;
+}
+
+/**
+ * Re-applies court, referee, time, and match order based on chosen scheduling scheme
+ * (Split Wave or Rolling Round-Robin)
+ */
+export function applyGroupStageSchedule(
+  allMatches: Match[],
+  courts: string[] = ['Court 1', 'Court 2', 'Court 3'],
+  scheme: GroupScheduleScheme = 'SPLIT_WAVE',
+  startTime: string = '08:00 WIB',
+  slotDurationMinutes: number = 45
+): Match[] {
+  const groupMatches = allMatches.filter((m) => m.phase === 'GROUP');
+  const nonGroupMatches = allMatches.filter((m) => m.phase !== 'GROUP');
+
+  if (groupMatches.length === 0) return allMatches;
+
+  const groups = ['Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'];
+  const groupMatchesMap: Record<string, Match[]> = {
+    'Grup 1': [],
+    'Grup 2': [],
+    'Grup 3': [],
+    'Grup 4': [],
+  };
+
+  groupMatches.forEach((m) => {
+    const g =
+      m.groupName ||
+      (m.roundName?.includes('Grup 1')
+        ? 'Grup 1'
+        : m.roundName?.includes('Grup 2')
+        ? 'Grup 2'
+        : m.roundName?.includes('Grup 3')
+        ? 'Grup 3'
+        : 'Grup 4');
+    if (groupMatchesMap[g]) {
+      groupMatchesMap[g].push(m);
+    }
+  });
+
+  const orderedMatches: Match[] = [];
+
+  if (scheme === 'ROLLING_ROUND') {
+    // Round 1 across all 4 groups
+    groups.forEach((g) => {
+      if (groupMatchesMap[g]?.[0]) orderedMatches.push(groupMatchesMap[g][0]);
+      if (groupMatchesMap[g]?.[1]) orderedMatches.push(groupMatchesMap[g][1]);
+    });
+    // Round 2 across all 4 groups
+    groups.forEach((g) => {
+      if (groupMatchesMap[g]?.[2]) orderedMatches.push(groupMatchesMap[g][2]);
+      if (groupMatchesMap[g]?.[3]) orderedMatches.push(groupMatchesMap[g][3]);
+    });
+    // Round 3 across all 4 groups
+    groups.forEach((g) => {
+      if (groupMatchesMap[g]?.[4]) orderedMatches.push(groupMatchesMap[g][4]);
+      if (groupMatchesMap[g]?.[5]) orderedMatches.push(groupMatchesMap[g][5]);
+    });
+  } else {
+    // SPLIT_WAVE (Gelombang 1: Grup 1 & 2, Gelombang 2: Grup 3 & 4)
+    const g1 = groupMatchesMap['Grup 1'] || [];
+    const g2 = groupMatchesMap['Grup 2'] || [];
+    if (g1[0]) orderedMatches.push(g1[0]);
+    if (g1[1]) orderedMatches.push(g1[1]);
+    if (g2[0]) orderedMatches.push(g2[0]);
+    if (g2[1]) orderedMatches.push(g2[1]);
+    if (g1[2]) orderedMatches.push(g1[2]);
+    if (g2[2]) orderedMatches.push(g2[2]);
+    if (g1[3]) orderedMatches.push(g1[3]);
+    if (g2[3]) orderedMatches.push(g2[3]);
+    if (g1[4]) orderedMatches.push(g1[4]);
+    if (g1[5]) orderedMatches.push(g1[5]);
+    if (g2[4]) orderedMatches.push(g2[4]);
+    if (g2[5]) orderedMatches.push(g2[5]);
+
+    const g3 = groupMatchesMap['Grup 3'] || [];
+    const g4 = groupMatchesMap['Grup 4'] || [];
+    if (g3[0]) orderedMatches.push(g3[0]);
+    if (g3[1]) orderedMatches.push(g3[1]);
+    if (g4[0]) orderedMatches.push(g4[0]);
+    if (g4[1]) orderedMatches.push(g4[1]);
+    if (g3[2]) orderedMatches.push(g3[2]);
+    if (g4[2]) orderedMatches.push(g4[2]);
+    if (g3[3]) orderedMatches.push(g3[3]);
+    if (g4[3]) orderedMatches.push(g4[3]);
+    if (g3[4]) orderedMatches.push(g3[4]);
+    if (g3[5]) orderedMatches.push(g3[5]);
+    if (g4[4]) orderedMatches.push(g4[4]);
+    if (g4[5]) orderedMatches.push(g4[5]);
+  }
+
+  // Any remaining group matches
+  const orderedIds = new Set(orderedMatches.map((m) => m.id));
+  groupMatches.forEach((m) => {
+    if (!orderedIds.has(m.id)) {
+      orderedMatches.push(m);
+    }
+  });
+
+  const actualCourts = courts.length > 0 ? courts : ['Court 1', 'Court 2', 'Court 3'];
+  const updatedGroupMatches = orderedMatches.map((m, idx) => {
+    const slotIndex = Math.floor(idx / actualCourts.length);
+    const courtIndex = idx % actualCourts.length;
+    return {
+      ...m,
+      matchOrder: idx + 1,
+      court: actualCourts[courtIndex] || `Court ${courtIndex + 1}`,
+      referee: `Wasit ${courtIndex + 1}`,
+      scheduledTime: calculateSlotTime(startTime, slotIndex, slotDurationMinutes),
+    };
+  });
+
+  return [...updatedGroupMatches, ...nonGroupMatches];
+}
+
+/**
+ * Generate Group Stage matches for TWO_STAGE Tournament
  * 16 participants divided into 4 groups (A, B, C, D) with 4 teams each
  * Each group plays round-robin (6 matches per group, 24 total)
  */
 export function generateGroupStageMatches(
   tournamentId: string,
   participants: Participant[],
-  courts: string[] = ['Court 1', 'Court 2', 'Court 3', 'Court 4']
+  courts: string[] = ['Court 1', 'Court 2', 'Court 3'],
+  scheme: GroupScheduleScheme = 'SPLIT_WAVE',
+  startTime: string = '08:00 WIB',
+  slotDurationMinutes: number = 45
 ): { matches: Match[]; groupedParticipants: Participant[] } {
   const groups = ['Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'];
-  const participantsPerGroup = 4;
   
   const groupedParticipants: Participant[] = [];
   const groupMaps: Record<string, Participant[]> = {
@@ -160,51 +297,119 @@ export function generateGroupStageMatches(
     groupMaps[p.group].push(p);
   }
 
-  // Generate round-robin matches for each group
-  const matches: Match[] = [];
-  let matchOrder = 1;
+  // Canonical Round-Robin Pairings for 4 teams [T0, T1, T2, T3]:
+  // Round 1: T0 vs T1, T2 vs T3
+  // Round 2: T0 vs T2, T1 vs T3
+  // Round 3: T0 vs T3, T1 vs T2
+  const groupMatchesMap: Record<string, Match[]> = {
+    'Grup 1': [],
+    'Grup 2': [],
+    'Grup 3': [],
+    'Grup 4': [],
+  };
 
   groups.forEach((groupName) => {
     const groupTeams = groupMaps[groupName];
     if (groupTeams.length !== 4) return;
 
-    // Round-robin: each team plays every other team once
-    // 4 teams = C(4,2) = 6 matches per group
-    for (let i = 0; i < groupTeams.length; i++) {
-      for (let j = i + 1; j < groupTeams.length; j++) {
-        const team1 = groupTeams[i];
-        const team2 = groupTeams[j];
-        
-        const matchId = `group_${tournamentId}_${groupName.replace(' ', '')}_m${matchOrder}`;
-        const courtIndex = (matchOrder - 1) % courts.length;
-        
-        const groupMatch: Match = {
-          id: matchId,
-          tournamentId,
-          round: 1, // All group matches are "round 1" in group phase
-          roundName: `Fase Grup - ${groupName}`,
-          matchOrder: matchOrder++,
-          participant1: team1,
-          participant2: team2,
-          scores: Array.from({ length: 5 }, (_, i) => ({ setNumber: i + 1, score1: 0, score2: 0 })),
-          currentSet: 1,
-          court: courts[courtIndex] || `Court 1`,
-          scheduledTime: '09:00 WIB',
-          referee: `Wasit ${courtIndex + 1}`,
-          status: 'UPCOMING',
-          winnerId: null,
-          nextMatchId: null,
-          nextMatchSlot: undefined,
-          phase: 'GROUP',
-          groupName: groupName,
-        };
-        
-        matches.push(groupMatch);
-      }
-    }
+    const roundPairs = [
+      [0, 1], // R1 M1
+      [2, 3], // R1 M2
+      [0, 2], // R2 M1
+      [1, 3], // R2 M2
+      [0, 3], // R3 M1
+      [1, 2], // R3 M2
+    ];
+
+    roundPairs.forEach(([t1Idx, t2Idx], pairIdx) => {
+      const matchId = `group_${tournamentId}_${groupName.replace(/\s+/g, '')}_m${pairIdx + 1}`;
+      const groupMatch: Match = {
+        id: matchId,
+        tournamentId,
+        round: 1,
+        roundName: `Fase Grup - ${groupName}`,
+        matchOrder: 1, // Will be ordered later
+        participant1: groupTeams[t1Idx],
+        participant2: groupTeams[t2Idx],
+        scores: Array.from({ length: 5 }, (_, i) => ({ setNumber: i + 1, score1: 0, score2: 0 })),
+        currentSet: 1,
+        court: 'Court 1',
+        scheduledTime: '08:00 WIB',
+        referee: 'Wasit 1',
+        status: 'UPCOMING',
+        winnerId: null,
+        nextMatchId: null,
+        nextMatchSlot: undefined,
+        phase: 'GROUP',
+        groupName: groupName,
+      };
+      groupMatchesMap[groupName].push(groupMatch);
+    });
   });
 
-  return { matches, groupedParticipants };
+  // Order matches according to chosen scheme
+  const orderedMatches: Match[] = [];
+
+  if (scheme === 'ROLLING_ROUND') {
+    // Round 1 (8 matches)
+    groups.forEach((g) => {
+      if (groupMatchesMap[g]?.[0]) orderedMatches.push(groupMatchesMap[g][0]);
+      if (groupMatchesMap[g]?.[1]) orderedMatches.push(groupMatchesMap[g][1]);
+    });
+    // Round 2 (8 matches)
+    groups.forEach((g) => {
+      if (groupMatchesMap[g]?.[2]) orderedMatches.push(groupMatchesMap[g][2]);
+      if (groupMatchesMap[g]?.[3]) orderedMatches.push(groupMatchesMap[g][3]);
+    });
+    // Round 3 (8 matches)
+    groups.forEach((g) => {
+      if (groupMatchesMap[g]?.[4]) orderedMatches.push(groupMatchesMap[g][4]);
+      if (groupMatchesMap[g]?.[5]) orderedMatches.push(groupMatchesMap[g][5]);
+    });
+  } else {
+    // SPLIT_WAVE (Gelombang 1: Grup 1 & 2, Gelombang 2: Grup 3 & 4)
+    const g1 = groupMatchesMap['Grup 1'] || [];
+    const g2 = groupMatchesMap['Grup 2'] || [];
+    if (g1[0]) orderedMatches.push(g1[0]);
+    if (g1[1]) orderedMatches.push(g1[1]);
+    if (g2[0]) orderedMatches.push(g2[0]);
+    if (g2[1]) orderedMatches.push(g2[1]);
+    if (g1[2]) orderedMatches.push(g1[2]);
+    if (g2[2]) orderedMatches.push(g2[2]);
+    if (g1[3]) orderedMatches.push(g1[3]);
+    if (g2[3]) orderedMatches.push(g2[3]);
+    if (g1[4]) orderedMatches.push(g1[4]);
+    if (g1[5]) orderedMatches.push(g1[5]);
+    if (g2[4]) orderedMatches.push(g2[4]);
+    if (g2[5]) orderedMatches.push(g2[5]);
+
+    const g3 = groupMatchesMap['Grup 3'] || [];
+    const g4 = groupMatchesMap['Grup 4'] || [];
+    if (g3[0]) orderedMatches.push(g3[0]);
+    if (g3[1]) orderedMatches.push(g3[1]);
+    if (g4[0]) orderedMatches.push(g4[0]);
+    if (g4[1]) orderedMatches.push(g4[1]);
+    if (g3[2]) orderedMatches.push(g3[2]);
+    if (g4[2]) orderedMatches.push(g4[2]);
+    if (g3[3]) orderedMatches.push(g3[3]);
+    if (g4[3]) orderedMatches.push(g4[3]);
+    if (g3[4]) orderedMatches.push(g3[4]);
+    if (g3[5]) orderedMatches.push(g3[5]);
+    if (g4[4]) orderedMatches.push(g4[4]);
+    if (g4[5]) orderedMatches.push(g4[5]);
+  }
+
+  const actualCourts = courts.length > 0 ? courts : ['Court 1', 'Court 2', 'Court 3'];
+  orderedMatches.forEach((m, idx) => {
+    const slotIndex = Math.floor(idx / actualCourts.length);
+    const courtIndex = idx % actualCourts.length;
+    m.matchOrder = idx + 1;
+    m.court = actualCourts[courtIndex] || `Court ${courtIndex + 1}`;
+    m.referee = `Wasit ${courtIndex + 1}`;
+    m.scheduledTime = calculateSlotTime(startTime, slotIndex, slotDurationMinutes);
+  });
+
+  return { matches: orderedMatches, groupedParticipants };
 }
 
 /**
