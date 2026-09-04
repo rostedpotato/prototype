@@ -23,6 +23,7 @@ import {
   Shield,
   Sparkles,
   RotateCcw,
+  Tv,
 } from 'lucide-react';
 
 export default function AdminTournamentManagePage() {
@@ -158,15 +159,27 @@ export default function AdminTournamentManagePage() {
           Kembali ke Dashboard Admin
         </Link>
 
-        <Link
-          href={`/tournament/${tournament.id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors"
-        >
-          <ExternalLink className="w-4 h-4" />
-          <span>Lihat Tampilan Publik</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/tournament/${tournament.id}/tv`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-lime-500/10 hover:bg-lime-500/20 text-lime-400 hover:text-lime-300 border border-lime-500/30 text-xs font-bold transition-all shadow-sm"
+          >
+            <Tv className="w-4 h-4" />
+            <span>📺 Layar TV Venue</span>
+          </Link>
+
+          <Link
+            href={`/tournament/${tournament.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+            <span>Lihat Tampilan Publik</span>
+          </Link>
+        </div>
       </div>
 
       {/* Admin Tournament Banner */}

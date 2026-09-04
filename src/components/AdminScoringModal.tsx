@@ -20,6 +20,9 @@ import {
   CircleDot,
   Users,
   Sparkles,
+  AlertTriangle,
+  RotateCcw,
+  Flag,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -216,10 +219,45 @@ export default function AdminScoringModal({
     }
   };
 
+  const handleDeclareWalkover = (losingSide: 1 | 2) => {
+    const winningParticipant = losingSide === 1 ? p2 : p1;
+    const losingParticipant = losingSide === 1 ? p1 : p2;
+    if (!winningParticipant || !losingParticipant) return;
+
+    if (
+      confirm(
+        `Nyatakan Walkover (WO) / Cedera?\n\n${losingParticipant.name} dinyatakan kalah WO.\n${winningParticipant.name} dinyatakan sebagai PEMENANG.`
+      )
+    ) {
+      setWinnerId(winningParticipant.id);
+      setStatus('WALKOVER');
+
+      // Populate winning sets for target games so record is clean
+      const setsNeeded = setsToWin || 3;
+      const target = targetGames || 6;
+      const woScores = scores.map((s, idx) => {
+        if (idx < setsNeeded) {
+          return {
+            ...s,
+            score1: losingSide === 2 ? target : 0,
+            score2: losingSide === 1 ? target : 0,
+          };
+        }
+        return { ...s, score1: 0, score2: 0 };
+      });
+      setScores(woScores);
+    }
+  };
+
+  const handleCancelWalkover = () => {
+    setStatus('LIVE');
+    setWinnerId(null);
+  };
+
   const handleSave = () => {
-    // Determine winner if finished
+    const isOver = status === 'FINISHED' || status === 'WALKOVER';
     let finalWinnerId = winnerId;
-    if (status === 'FINISHED' && !finalWinnerId) {
+    if (isOver && !finalWinnerId) {
       if (matchWinnerStatus.winnerSide === 1 && p1) finalWinnerId = p1.id;
       else if (matchWinnerStatus.winnerSide === 2 && p2) finalWinnerId = p2.id;
     }
@@ -230,7 +268,7 @@ export default function AdminScoringModal({
       currentSet: activeSet,
       servingSide,
       status,
-      winnerId: status === 'FINISHED' ? finalWinnerId : null,
+      winnerId: isOver ? finalWinnerId : null,
       court,
       referee,
       scheduledTime,
@@ -238,7 +276,7 @@ export default function AdminScoringModal({
       participant2: p2 || null,
     });
 
-    if (status === 'FINISHED' && finalWinnerId) {
+    if (isOver && finalWinnerId) {
       try {
         confetti({
           particleCount: 80,
@@ -681,6 +719,63 @@ export default function AdminScoringModal({
                 🏆 {p2?.name || 'Peserta 2 (Belum ditentukan)'}
               </button>
             </div>
+          </div>
+
+          {/* Walkover / Cedera Declaration Box */}
+          <div className="p-3.5 bg-rose-950/30 border border-rose-800/40 rounded-2xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
+                <Flag className="w-4 h-4 text-rose-400" />
+                <span>Deklarasi Walkover (WO) / Menyerah (Cedera):</span>
+              </div>
+              {status === 'WALKOVER' && (
+                <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-black animate-pulse">
+                  STATUS: WALKOVER
+                </span>
+              )}
+            </div>
+
+            {status === 'WALKOVER' ? (
+              <div className="flex items-center justify-between p-2.5 bg-rose-900/20 border border-rose-800/50 rounded-xl gap-2">
+                <div className="text-xs text-rose-200">
+                  ⚠️ Pertandingan dinyatakan <strong>WALKOVER</strong>. Pemenang: <strong>{tournament.participants.find(p => p.id === winnerId)?.name || 'Pemenang WO'}</strong>.
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCancelWalkover}
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold rounded-lg border border-slate-700 flex items-center gap-1 transition-colors whitespace-nowrap"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Batalkan WO</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDeclareWalkover(1)}
+                  disabled={!p1 || !p2}
+                  className="p-2 rounded-xl border border-rose-800/50 bg-rose-950/40 hover:bg-rose-900/40 text-rose-300 text-xs font-semibold text-left transition-all flex items-center justify-between disabled:opacity-50"
+                >
+                  <span className="truncate">{p1?.name || 'Tim 1'} WO / Cedera</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-200 whitespace-nowrap ml-1">
+                    ➔ {p2?.name?.slice(0, 8) || 'Tim 2'} Menang
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeclareWalkover(2)}
+                  disabled={!p1 || !p2}
+                  className="p-2 rounded-xl border border-rose-800/50 bg-rose-950/40 hover:bg-rose-900/40 text-rose-300 text-xs font-semibold text-left transition-all flex items-center justify-between disabled:opacity-50"
+                >
+                  <span className="truncate">{p2?.name || 'Tim 2'} WO / Cedera</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-200 whitespace-nowrap ml-1">
+                    ➔ {p1?.name?.slice(0, 8) || 'Tim 1'} Menang
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

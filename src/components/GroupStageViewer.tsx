@@ -263,7 +263,8 @@ export default function GroupStageViewer({
             .filter((m) => m.phase === 'GROUP' && (selectedGroupTab === 'ALL' || m.groupName === selectedGroupTab || m.roundName?.includes(selectedGroupTab)))
             .sort((a, b) => (a.matchOrder || 0) - (b.matchOrder || 0))
             .map((match) => {
-              const isFinished = match.status === 'FINISHED';
+              const isFinished = match.status === 'FINISHED' || match.status === 'WALKOVER';
+              const isWalkover = match.status === 'WALKOVER';
               const isLive = match.status === 'LIVE';
               const { setsWon1, setsWon2 } = getMatchSetsSummary(match.scores);
               const activeScores = getActiveSets(match.scores);
@@ -274,6 +275,8 @@ export default function GroupStageViewer({
                   className={`p-4 rounded-2xl border transition-all ${
                     isLive
                       ? 'bg-lime-500/5 border-lime-500/40 shadow-lg shadow-lime-500/5'
+                      : isWalkover
+                      ? 'bg-rose-950/20 border-rose-800/40'
                       : isFinished
                       ? 'bg-slate-900/80 border-slate-800'
                       : 'bg-slate-900/50 border-slate-800/80'
@@ -304,7 +307,12 @@ export default function GroupStageViewer({
                           LIVE
                         </span>
                       )}
-                      {isFinished && (
+                      {isWalkover && (
+                        <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-black">
+                          Menang WO
+                        </span>
+                      )}
+                      {match.status === 'FINISHED' && (
                         <span className="px-2 py-0.5 rounded-full bg-slate-800 text-emerald-400 font-black">
                           Selesai
                         </span>

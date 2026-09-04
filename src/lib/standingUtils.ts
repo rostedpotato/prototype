@@ -52,7 +52,7 @@ export function calculateGroupStandings(
     const finishedMatches = groupMatches.filter(
       (m) =>
         (m.participant1?.id === p.id || m.participant2?.id === p.id) &&
-        m.status === 'FINISHED'
+        (m.status === 'FINISHED' || m.status === 'WALKOVER')
     );
 
     let wins = 0;

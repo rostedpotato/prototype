@@ -20,6 +20,7 @@ import {
   Layers,
   ListOrdered,
   Medal,
+  Tv,
 } from 'lucide-react';
 
 export default function TournamentDetailPage() {
@@ -131,7 +132,16 @@ export default function TournamentDetailPage() {
             </div>
           </div>
 
-          <div className="pt-4 border-t border-slate-800/50 flex justify-end">
+          <div className="pt-4 border-t border-slate-800/50 flex items-center justify-between gap-3 flex-wrap">
+            <Link
+              href={`/tournament/${tournament.id}/tv`}
+              target="_blank"
+              className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-lime-400 hover:text-lime-300 border border-lime-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md"
+            >
+              <Tv className="w-4 h-4" />
+              <span>📺 Layar TV / Big Screen Venue</span>
+            </Link>
+
             <Link
               href="/register"
               className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-xl text-sm font-bold transition-colors shadow-lg shadow-emerald-500/20"

@@ -319,7 +319,7 @@ export const TournamentService = {
     matches[mIndex] = currentMatch;
 
     // Automatic Bracket Advancement Logic
-    if (currentMatch.status === 'FINISHED' && currentMatch.winnerId) {
+    if ((currentMatch.status === 'FINISHED' || currentMatch.status === 'WALKOVER') && currentMatch.winnerId) {
       const winner =
         currentMatch.participant1?.id === currentMatch.winnerId
           ? currentMatch.participant1
@@ -339,8 +339,13 @@ export const TournamentService = {
           matches[nextIndex] = nextMatch;
         }
       }
-    } else if (currentMatch.status !== 'FINISHED' && currentMatch.nextMatchId && currentMatch.nextMatchSlot) {
-      // If match was reverted from FINISHED, clear advancement using the ORIGINAL winnerId
+    } else if (
+      currentMatch.status !== 'FINISHED' &&
+      currentMatch.status !== 'WALKOVER' &&
+      currentMatch.nextMatchId &&
+      currentMatch.nextMatchSlot
+    ) {
+      // If match was reverted from FINISHED/WALKOVER, clear advancement using the ORIGINAL winnerId
       const nextIndex = matches.findIndex((m) => m.id === currentMatch.nextMatchId);
       if (nextIndex !== -1 && originalWinnerId) {
         const nextMatch = { ...matches[nextIndex] };

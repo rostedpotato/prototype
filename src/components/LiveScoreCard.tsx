@@ -23,7 +23,7 @@ export default function LiveScoreCard({
   const { isAdmin } = useAdminAuth();
 
   const isLive = match.status === 'LIVE';
-  const isFinished = match.status === 'FINISHED';
+  const isFinished = match.status === 'FINISHED' || match.status === 'WALKOVER';
   const { setsWon1, setsWon2 } = getMatchSetsSummary(match.scores);
 
   const isWinner1 = match.winnerId && match.winnerId === match.participant1?.id;
@@ -74,7 +74,13 @@ export default function LiveScoreCard({
               LIVE SET {match.currentSet}
             </span>
           )}
-          {isFinished && (
+          {match.status === 'WALKOVER' && (
+            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold text-[11px] border border-rose-500/40">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+              Menang WO
+            </span>
+          )}
+          {match.status === 'FINISHED' && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-semibold text-[11px] border border-slate-700">
               <CheckCircle2 className="w-3 h-3 text-emerald-400" />
               Selesai
