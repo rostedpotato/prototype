@@ -5,9 +5,36 @@ import { INITIAL_TOURNAMENTS } from './initialData';
 import { calculateMatchWinner, getSetsToWinForRound, getTargetGamesForMatch } from './scoreRules';
 import { calculateGroupStandings } from './standingUtils';
 import { generateKnockoutStageFromGroups } from './bracketGenerator';
+import {
+  deleteTournamentFromSupabase,
+  getRealtimeStatus,
+  insertRegistrationToSupabase,
+  isCurrentUserAdmin,
+  loadTournamentsFromSupabase,
+  saveTournamentsToSupabase,
+  subscribeToRealtimeStatus,
+  subscribeToTournamentChanges,
+} from './supabase/tournamentRepository';
+import type { RealtimeConnectionStatus } from './supabase/tournamentRepository';
 
 const STORAGE_KEY = 'racket_tournaments_v2';
+const LEGACY_MIGRATION_KEY = 'racket_tournaments_supabase_migrated_v1';
 const EVENT_KEY = 'racket_tournament_updated';
+let inMemoryTournaments: Tournament[] | null = null;
+
+function describeStoreError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object') {
+    const candidate = error as Record<string, unknown>;
+    if (typeof candidate.message === 'string') return candidate.message;
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return 'Unknown error';
+    }
+  }
+  return String(error);
+}
 
 // BroadcastChannel for instant multi-tab sync
 let syncChannel: BroadcastChannel | null = null;
@@ -19,51 +46,149 @@ if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
   }
 }
 
-// Helper to safely access localStorage in client
+// Supabase is the primary source of truth. The browser cache exists only to
+// support one-time migration and offline UI continuity during a write.
 function getStoredTournaments(): Tournament[] {
-  if (typeof window === 'undefined') {
-    return INITIAL_TOURNAMENTS;
-  }
+  if (inMemoryTournaments !== null) return inMemoryTournaments;
+  return getLegacyTournaments() || [];
+}
+
+function getLegacyTournaments(): Tournament[] | null {
+  if (typeof window === 'undefined') return null;
+
   try {
-    let raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      // Check if v1 exists and migrate it
-      const v1 = localStorage.getItem('racket_tournaments_v1');
-      if (v1) {
-        localStorage.setItem(STORAGE_KEY, v1);
-        return JSON.parse(v1);
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_TOURNAMENTS));
-      return INITIAL_TOURNAMENTS;
-    }
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('racket_tournaments_v1');
+    if (!raw) return null;
+
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_TOURNAMENTS));
-      return INITIAL_TOURNAMENTS;
-    }
-    return parsed;
-  } catch (e) {
-    console.error('Error reading localStorage', e);
-    return INITIAL_TOURNAMENTS;
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
   }
 }
 
-function saveTournaments(tournaments: Tournament[]) {
+function cacheTournaments(tournaments: Tournament[]) {
+  inMemoryTournaments = tournaments;
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tournaments));
+}
+
+function isLegacyMigrationComplete(): boolean {
+  return typeof window !== 'undefined' && localStorage.getItem(LEGACY_MIGRATION_KEY) === 'true';
+}
+
+function markLegacyMigrationComplete() {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(LEGACY_MIGRATION_KEY, 'true');
+  }
+}
+
+function mergeIncompleteRemoteTournaments(
+  remoteTournaments: Tournament[],
+  legacyTournaments: Tournament[]
+): { tournaments: Tournament[]; needsRepair: boolean } {
+  let needsRepair = false;
+
+  const tournaments = remoteTournaments.map((remoteTournament) => {
+    const legacyTournament = legacyTournaments.find((item) => item.id === remoteTournament.id);
+    if (!legacyTournament) return remoteTournament;
+
+    const shouldRestoreParticipants =
+      remoteTournament.participants.length === 0 && legacyTournament.participants.length > 0;
+    const shouldRestoreMatches =
+      remoteTournament.matches.length === 0 && legacyTournament.matches.length > 0;
+    const shouldRestoreRegistrations =
+      (remoteTournament.registrations || []).length === 0 &&
+      (legacyTournament.registrations || []).length > 0;
+
+    if (!shouldRestoreParticipants && !shouldRestoreMatches && !shouldRestoreRegistrations) {
+      return remoteTournament;
+    }
+
+    needsRepair = true;
+    return {
+      ...remoteTournament,
+      participants: shouldRestoreParticipants
+        ? legacyTournament.participants
+        : remoteTournament.participants,
+      matches: shouldRestoreMatches ? legacyTournament.matches : remoteTournament.matches,
+      registrations: shouldRestoreRegistrations
+        ? legacyTournament.registrations
+        : remoteTournament.registrations,
+    };
+  });
+
+  return { tournaments, needsRepair };
+}
+
+async function getResolvedRemoteTournaments(): Promise<Tournament[] | null> {
+  const remoteTournaments = await loadTournamentsFromSupabase();
+  const legacyTournaments = getLegacyTournaments();
+
+  if (remoteTournaments.length === 0) {
+    if (!legacyTournaments || !(await isCurrentUserAdmin())) {
+      return legacyTournaments ? null : [];
+    }
+
+    await saveTournamentsToSupabase(legacyTournaments);
+    markLegacyMigrationComplete();
+    return loadTournamentsFromSupabase();
+  }
+
+  if (isLegacyMigrationComplete() || !legacyTournaments || !(await isCurrentUserAdmin())) {
+    return remoteTournaments;
+  }
+
+  const merged = mergeIncompleteRemoteTournaments(remoteTournaments, legacyTournaments);
+  const remoteIds = new Set(remoteTournaments.map((tournament) => tournament.id));
+  const legacyOnlyTournaments = legacyTournaments.filter(
+    (tournament) => !remoteIds.has(tournament.id)
+  );
+
+  if (merged.needsRepair || legacyOnlyTournaments.length > 0) {
+    await saveTournamentsToSupabase([...merged.tournaments, ...legacyOnlyTournaments]);
+  }
+
+  markLegacyMigrationComplete();
+  return loadTournamentsFromSupabase();
+}
+
+function saveTournaments(tournaments: Tournament[], syncRemote = true) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tournaments));
+    cacheTournaments(tournaments);
     // Dispatch local event for current tab
     window.dispatchEvent(new Event(EVENT_KEY));
     // Broadcast to other open tabs
     if (syncChannel) {
       syncChannel.postMessage({ type: 'UPDATE' });
     }
+
+    if (syncRemote) {
+      void saveTournamentsToSupabase(tournaments).catch((error: unknown) => {
+        console.error('Gagal menyinkronkan turnamen ke Supabase:', error);
+      });
+    }
   } catch (e) {
     console.error('Error saving to localStorage', e);
   }
 }
 
+function syncTournamentToSupabase(tournament: Tournament) {
+  void saveTournamentsToSupabase([tournament]).catch((error: unknown) => {
+    console.error(
+      `Gagal menyinkronkan tournament ${tournament.id} ke Supabase:`,
+      describeStoreError(error),
+      error
+    );
+  });
+}
+
 export const TournamentService = {
+  async syncNow(): Promise<void> {
+    await saveTournamentsToSupabase(getStoredTournaments());
+  },
+
   getAll(): Tournament[] {
     return getStoredTournaments();
   },
@@ -73,10 +198,11 @@ export const TournamentService = {
     return list.find((t) => t.id === id) || null;
   },
 
-  create(tournament: Tournament): Tournament {
+  async create(tournament: Tournament): Promise<Tournament> {
     const list = getStoredTournaments();
     const updated = [tournament, ...list];
-    saveTournaments(updated);
+    saveTournaments(updated, false);
+    await saveTournamentsToSupabase([tournament]);
     return tournament;
   },
 
@@ -100,15 +226,20 @@ export const TournamentService = {
     }
 
     list[index] = updated;
-    saveTournaments(list);
+    saveTournaments(list, false);
+    syncTournamentToSupabase(updated);
     return list[index];
   },
 
-  submitRegistration(tournamentId: string, payload: Omit<import('@/types/tournament').RegistrationRequest, 'id' | 'tournamentId' | 'status' | 'createdAt'>): boolean {
+  async submitRegistration(tournamentId: string, payload: Omit<import('@/types/tournament').RegistrationRequest, 'id' | 'tournamentId' | 'status' | 'createdAt'>): Promise<boolean> {
     const list = getStoredTournaments();
     const index = list.findIndex((t) => t.id === tournamentId);
     if (index === -1) return false;
 
+    const previousList = list.map((tournament) => ({
+      ...tournament,
+      registrations: tournament.registrations ? [...tournament.registrations] : [],
+    }));
     const t = list[index];
     const newReg: import('@/types/tournament').RegistrationRequest = {
       ...payload,
@@ -117,11 +248,19 @@ export const TournamentService = {
       status: 'PENDING',
       createdAt: new Date().toISOString()
     };
-    
+
     t.registrations = [...(t.registrations || []), newReg];
     list[index] = t;
-    saveTournaments(list);
-    return true;
+    saveTournaments(list, false);
+
+    try {
+      await insertRegistrationToSupabase(newReg);
+      return true;
+    } catch (error) {
+      saveTournaments(previousList, false);
+      console.error('Gagal menyimpan pendaftaran ke Supabase:', error);
+      return false;
+    }
   },
 
   processRegistration(tournamentId: string, registrationId: string, status: import('@/types/tournament').RegistrationStatus): boolean {
@@ -168,23 +307,25 @@ export const TournamentService = {
     }
 
     list[index] = t;
-    saveTournaments(list);
+    saveTournaments(list, false);
+    syncTournamentToSupabase(t);
     return true;
   },
 
   delete(id: string): boolean {
     const list = getStoredTournaments();
     const filtered = list.filter((t) => t.id !== id);
-    saveTournaments(filtered);
+    saveTournaments(filtered, false);
+    void deleteTournamentFromSupabase(id).catch((error: unknown) => {
+      console.error('Gagal menghapus turnamen dari Supabase:', error);
+    });
     return true;
   },
 
   resetDefaults(): Tournament[] {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_TOURNAMENTS));
-        window.dispatchEvent(new Event(EVENT_KEY));
-        if (syncChannel) syncChannel.postMessage({ type: 'UPDATE' });
+        saveTournaments(INITIAL_TOURNAMENTS, true);
       } catch (e) {
         // localStorage may be full or disabled - silent fallback
       }
@@ -223,7 +364,7 @@ export const TournamentService = {
         return { success: false, error: 'Struktur data turnamen dalam file tidak sesuai.' };
       }
 
-      saveTournaments(parsed);
+      saveTournaments(parsed, true);
       return { success: true, count: parsed.length };
     } catch (e: any) {
       return { success: false, error: e?.message || 'Gagal memproses file JSON.' };
@@ -259,7 +400,8 @@ export const TournamentService = {
     matches[mIndex] = currentMatch;
     tournament.matches = matches;
     list[tIndex] = tournament;
-    saveTournaments(list);
+    saveTournaments(list, false);
+    syncTournamentToSupabase(tournament);
     return tournament;
   },
 
@@ -388,7 +530,8 @@ export const TournamentService = {
     }
 
     list[tIndex] = tournament;
-    saveTournaments(list);
+    saveTournaments(list, false);
+    syncTournamentToSupabase(tournament);
     return tournament;
   },
 
@@ -412,21 +555,58 @@ export const TournamentService = {
     tournament.groupStageCompleted = true;
 
     list[tIndex] = tournament;
-    saveTournaments(list);
+    saveTournaments(list, false);
+    syncTournamentToSupabase(tournament);
     return tournament;
   },
 };
 
 // React hooks
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
+
+export function useRealtimeStatus(): RealtimeConnectionStatus {
+  return useSyncExternalStore(
+    (onStoreChange) => subscribeToRealtimeStatus(() => onStoreChange()),
+    getRealtimeStatus,
+    () => 'DISCONNECTED' as RealtimeConnectionStatus
+  );
+}
 
 export function useTournaments() {
-  const [tournaments, setTournaments] = useState<Tournament[]>(INITIAL_TOURNAMENTS);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
-    setTournaments(TournamentService.getAll());
+    let cancelled = false;
+
+    const hydrate = async () => {
+      try {
+        const remoteTournaments = await getResolvedRemoteTournaments();
+
+        if (remoteTournaments) {
+          if (!cancelled) {
+            cacheTournaments(remoteTournaments);
+            setTournaments(remoteTournaments);
+            setIsClient(true);
+          }
+          return;
+        }
+
+        const legacyTournaments = getLegacyTournaments();
+        if (!cancelled) {
+          setTournaments(legacyTournaments || []);
+          setIsClient(true);
+        }
+      } catch (error) {
+        console.error('Gagal memuat turnamen dari Supabase:', describeStoreError(error), error);
+        if (!cancelled) {
+          setTournaments(getStoredTournaments());
+          setIsClient(true);
+        }
+      }
+    };
+
+    void hydrate();
 
     const handleUpdate = () => {
       setTournaments(TournamentService.getAll());
@@ -439,7 +619,22 @@ export function useTournaments() {
       syncChannel.addEventListener('message', handleUpdate);
     }
 
+    const unsubscribeRealtime = subscribeToTournamentChanges(() => {
+      void getResolvedRemoteTournaments()
+        .then((remoteTournaments) => {
+          if (!cancelled && remoteTournaments) {
+            cacheTournaments(remoteTournaments);
+            setTournaments(remoteTournaments);
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('Realtime refresh tournament gagal:', describeStoreError(error), error);
+        });
+    });
+
     return () => {
+      cancelled = true;
+      unsubscribeRealtime();
       window.removeEventListener(EVENT_KEY, handleUpdate);
       window.removeEventListener('storage', handleUpdate);
       if (syncChannel) {
@@ -452,14 +647,41 @@ export function useTournaments() {
 }
 
 export function useTournament(id: string) {
-  const [tournament, setTournament] = useState<Tournament | null>(() => {
-    return INITIAL_TOURNAMENTS.find((t) => t.id === id) || null;
-  });
+  const [tournament, setTournament] = useState<Tournament | null>(null);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
-    setTournament(TournamentService.getById(id));
+    let cancelled = false;
+
+    const hydrate = async () => {
+      try {
+        const remoteTournaments = await getResolvedRemoteTournaments();
+
+        if (remoteTournaments) {
+          const remoteTournament = remoteTournaments.find((item) => item.id === id) || null;
+          if (!cancelled) {
+            cacheTournaments(remoteTournaments);
+            setTournament(remoteTournament);
+            setIsClient(true);
+          }
+          return;
+        }
+
+        const legacyTournaments = getLegacyTournaments();
+        if (!cancelled) {
+          setTournament(legacyTournaments?.find((item) => item.id === id) || null);
+          setIsClient(true);
+        }
+      } catch (error) {
+        console.error('Gagal memuat turnamen dari Supabase:', describeStoreError(error), error);
+        if (!cancelled) {
+          setTournament(TournamentService.getById(id));
+          setIsClient(true);
+        }
+      }
+    };
+
+    void hydrate();
 
     const handleUpdate = () => {
       setTournament(TournamentService.getById(id));
@@ -472,7 +694,22 @@ export function useTournament(id: string) {
       syncChannel.addEventListener('message', handleUpdate);
     }
 
+    const unsubscribeRealtime = subscribeToTournamentChanges(() => {
+      void getResolvedRemoteTournaments()
+        .then((remoteTournaments) => {
+          if (!cancelled && remoteTournaments) {
+            cacheTournaments(remoteTournaments);
+            setTournament(remoteTournaments.find((item) => item.id === id) || null);
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('Realtime refresh tournament gagal:', describeStoreError(error), error);
+        });
+    });
+
     return () => {
+      cancelled = true;
+      unsubscribeRealtime();
       window.removeEventListener(EVENT_KEY, handleUpdate);
       window.removeEventListener('storage', handleUpdate);
       if (syncChannel) {

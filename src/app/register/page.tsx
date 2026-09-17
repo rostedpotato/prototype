@@ -38,7 +38,7 @@ export default function GlobalRegisterPage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.termsAccepted) {
       setError('Anda harus menyetujui Syarat & Ketentuan');
@@ -91,7 +91,7 @@ export default function GlobalRegisterPage() {
         return;
       }
 
-      const success = service.submitRegistration(formData.tournamentId, {
+      const success = await service.submitRegistration(formData.tournamentId, {
         sector: selectedTournament.categoryLabel, // We store the category label as sector
         teamName: teamNameStr,
         player1Name: p1NameStr,

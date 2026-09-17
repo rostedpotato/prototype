@@ -1,41 +1,64 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
 
-const ADMIN_AUTH_KEY = 'racket_admin_authenticated';
+const supabase = createClient();
 
+async function getAdminStatus(user: User | null): Promise<boolean> {
+  if (!user) return false;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  return !error && data?.role === 'ADMIN';
+}
 
 export const AuthService = {
-  isAdmin(): boolean {
-    if (typeof window === 'undefined') return false;
-    try {
-      return localStorage.getItem(ADMIN_AUTH_KEY) === 'true';
-    } catch {
-      return false;
+  async isAdmin(user?: User | null): Promise<boolean> {
+    if (user === undefined) {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) return false;
+      return getAdminStatus(data.user);
     }
+
+    return getAdminStatus(user);
   },
 
-  login(username: string, pin: string): boolean {
-    if (username === 'admin' && pin === 'password123') {
-      try {
-        localStorage.setItem(ADMIN_AUTH_KEY, 'true');
-        window.dispatchEvent(new Event('auth_changed'));
-      } catch {
-        // localStorage unavailable — session will not persist across tabs
-      }
-      return true;
+  async login(
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error || !data.user) {
+      return {
+        success: false,
+        error: error?.message || 'Login gagal.',
+      };
     }
-    return false;
+
+    const admin = await getAdminStatus(data.user);
+    if (!admin) {
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: 'Akun ini belum memiliki akses admin.',
+      };
+    }
+
+    return { success: true };
   },
 
-  logout(): void {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.removeItem(ADMIN_AUTH_KEY);
-      window.dispatchEvent(new Event('auth_changed'));
-    } catch {
-      // localStorage unavailable
-    }
+  async logout(): Promise<void> {
+    await supabase.auth.signOut();
   },
 };
 
@@ -44,20 +67,34 @@ export function useAdminAuth() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    setIsAdmin(AuthService.isAdmin());
-    setIsReady(true);
+    let mounted = true;
 
-    const handleAuth = () => {
-      setIsAdmin(AuthService.isAdmin());
+    const refreshAuth = async (user?: User | null) => {
+      const admin = await AuthService.isAdmin(user);
+      if (!mounted) return;
+
+      setIsAdmin(admin);
+      setIsReady(true);
     };
 
-    window.addEventListener('auth_changed', handleAuth);
-    window.addEventListener('storage', handleAuth);
+    void refreshAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      void refreshAuth(session?.user ?? null);
+    });
+
     return () => {
-      window.removeEventListener('auth_changed', handleAuth);
-      window.removeEventListener('storage', handleAuth);
+      mounted = false;
+      subscription.unsubscribe();
     };
   }, []);
 
-  return { isAdmin, isReady, login: AuthService.login, logout: AuthService.logout };
+  return {
+    isAdmin,
+    isReady,
+    login: AuthService.login,
+    logout: AuthService.logout,
+  };
 }

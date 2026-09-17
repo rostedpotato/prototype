@@ -106,7 +106,7 @@ export default function NewTournamentPage() {
     setParticipants(participants.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -184,8 +184,13 @@ export default function NewTournamentPage() {
       createdAt: new Date().toISOString(),
     };
 
-    TournamentService.create(newTournament);
-    router.push(`/admin/tournament/${tournamentId}`);
+    try {
+      await TournamentService.create(newTournament);
+      router.push(`/admin/tournament/${tournamentId}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Gagal menyimpan tournament.';
+      alert(message);
+    }
   };
 
   return (

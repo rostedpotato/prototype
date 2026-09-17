@@ -1,6 +1,6 @@
 # 🏸 Racket Arena - Badminton & Padel Tournament Hub
 
-Platform manajemen dan *live score* turnamen Bulutangkis (Badminton) dan Padel berbasis **Next.js (App Router)**, **TypeScript**, dan **Tailwind CSS**. Didesain ringan, minimalis, dan sangat efisien untuk di-deploy gratis di **Vercel Free Tier** dengan estimasi traffic hingga 500+ pengguna simultan saat jam puncak (*peak hour*).
+Platform manajemen dan *live score* turnamen Bulutangkis (Badminton) dan Padel berbasis **Next.js**, **TypeScript**, **Supabase**, dan **Tailwind CSS**. Data tournament, pendaftaran, peserta, pertandingan, serta skor disimpan di PostgreSQL Supabase dan diperbarui lintas browser melalui Supabase Realtime.
 
 ---
 
@@ -19,7 +19,7 @@ Platform manajemen dan *live score* turnamen Bulutangkis (Badminton) dan Padel b
 * **Daftar Peserta & Seeding**: Menampilkan pemain/pasangan terdaftar, klub asal, dan nomor unggulan (*seed*).
 
 ### 2. Role: Admin & Wasit (Management & Live Scoring)
-* 🔒 **Autentikasi Admin**: Akses khusus admin dengan PIN (Default: `admin123` / 1-Klik Demo Login).
+* 🔒 **Autentikasi Admin**: Login menggunakan email dan password Supabase Auth. Hak akses admin ditentukan oleh `profiles.role = 'ADMIN'`.
 * 🏆 **Pembuat Turnamen Otomatis**:
   * Pilihan cabang: **Badminton** (Format 21 poin) atau **Padel** (Format 6 game set).
   * Auto-generator bagan sistem gugur (*single elimination tree*) untuk 4, 8, atau 16 peserta.
@@ -36,12 +36,14 @@ Platform manajemen dan *live score* turnamen Bulutangkis (Badminton) dan Padel b
 
 ## 🛠️ Tech Stack & Arsitektur
 
-* **Full-Stack Framework**: Next.js 15+ (App Router, Server & Client Components)
+* **Full-Stack Framework**: Next.js 16+ (App Router, Server & Client Components)
 * **Bahasa**: TypeScript (100% Type-Safe)
 * **Styling**: Tailwind CSS v4 (Athletic Dark Theme, Slate & Lime Accents)
 * **Ikon**: Lucide React
 * **Efek Perayaan**: Canvas Confetti
-* **State & Sync**: LocalStorage + `BroadcastChannel` (Sinkronisasi multi-tab instan tanpa lag)
+* **Database & Auth**: Supabase PostgreSQL, Row Level Security (RLS), dan Supabase Auth
+* **Realtime**: Supabase Realtime (Postgres Changes) untuk tournament, pendaftaran, peserta, pertandingan, dan skor
+* **Cache kompatibilitas**: `localStorage` hanya digunakan sementara untuk migrasi data lama dan kontinuitas UI; Supabase adalah sumber data utama
 * **Optimasi Performa**: Custom `useDebounce` hook untuk efisiensi input & database query
 
 ---
@@ -58,15 +60,27 @@ Platform manajemen dan *live score* turnamen Bulutangkis (Badminton) dan Padel b
    npm install
    ```
 
-3. **Jalankan Server Development**:
+3. **Siapkan environment Supabase**:
+
+   ```bash
+   copy .env.example .env.local
+   ```
+
+   Isi `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` dari project Supabase Anda. Jalankan migration SQL di folder `supabase/migrations` secara berurutan.
+
+4. **Jalankan Server Development**:
    ```bash
    npm run dev
    ```
 
-4. **Buka di Browser**:
+5. **Buka di Browser**:
    * Halaman Publik Penonton: [`http://localhost:3000`](http://localhost:3000)
-   * Login Admin: [`http://localhost:3000/admin/login`](http://localhost:3000/admin/login) (PIN: `admin123`)
+   * Login Admin: [`http://localhost:3000/admin/login`](http://localhost:3000/admin/login)
    * Dashboard Admin: [`http://localhost:3000/admin`](http://localhost:3000/admin)
+
+6. **Cek koneksi production-like**:
+
+   Buka [`http://localhost:3000/api/supabase/health`](http://localhost:3000/api/supabase/health). Respons sukses memiliki `ok: true`, `database: true`, dan jumlah tournament saat ini.
 
 ---
 
@@ -75,9 +89,17 @@ Platform manajemen dan *live score* turnamen Bulutangkis (Badminton) dan Padel b
 1. Upload / Push repository ini ke akun **GitHub** Anda.
 2. Buka **[vercel.com](https://vercel.com)** dan masuk dengan GitHub.
 3. Klik **"Add New Project"** dan pilih repository ini.
-4. Framework Preset akan otomatis terdeteksi sebagai **Next.js**.
-5. Klik **"Deploy"**.
-6. Website langsung online dengan URL publik gratis (contoh: `https://turnamen-racket.vercel.app`).
+4. Tambahkan dua Environment Variables untuk **Production**, **Preview**, dan **Development**:
+
+   ```text
+   NEXT_PUBLIC_SUPABASE_URL
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+   ```
+
+5. Framework Preset akan otomatis terdeteksi sebagai **Next.js**. Klik **"Deploy"**.
+6. Setelah deploy, buka `https://domain-anda.vercel.app/api/supabase/health` untuk memastikan koneksi Supabase berhasil.
+
+> Jangan pernah memasukkan `SUPABASE_SERVICE_ROLE_KEY` ke environment variable yang diawali `NEXT_PUBLIC_` atau ke kode browser.
 
 ---
 

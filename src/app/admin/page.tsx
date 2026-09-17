@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useTournaments } from '@/lib/tournamentStore';
+import { useRealtimeStatus, useTournaments } from '@/lib/tournamentStore';
 import { useAdminAuth } from '@/lib/authStore';
 import {
   Shield,
@@ -27,8 +27,10 @@ export default function AdminDashboardPage() {
   const router = useRouter();
   const { isAdmin, isReady } = useAdminAuth();
   const { tournaments, service } = useTournaments();
+  const realtimeStatus = useRealtimeStatus();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     if (isReady && !isAdmin) {
@@ -72,6 +74,28 @@ export default function AdminDashboardPage() {
     } catch {
       setNotice({ type: 'error', message: 'Gagal mengekspor data backup.' });
       setTimeout(() => setNotice(null), 4000);
+    }
+  };
+
+  const handleSyncToSupabase = async () => {
+    setIsSyncing(true);
+    setNotice(null);
+
+    try {
+      await service.syncNow();
+      setNotice({
+        type: 'success',
+        message: 'Semua data tournament berhasil disinkronkan ke Supabase.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Kesalahan tidak diketahui.';
+      setNotice({
+        type: 'error',
+        message: `Sinkronisasi Supabase gagal: ${message}`,
+      });
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setNotice(null), 7000);
     }
   };
 
@@ -120,6 +144,32 @@ export default function AdminDashboardPage() {
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                 PRO PANEL
               </span>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  realtimeStatus === 'CONNECTED'
+                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                    : realtimeStatus === 'ERROR'
+                    ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                }`}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      realtimeStatus === 'CONNECTED'
+                        ? 'bg-emerald-400'
+                        : realtimeStatus === 'ERROR'
+                        ? 'bg-red-400'
+                        : 'bg-amber-400 animate-pulse'
+                    }`}
+                  />
+                  {realtimeStatus === 'CONNECTED'
+                    ? 'REALTIME TERHUBUNG'
+                    : realtimeStatus === 'ERROR'
+                    ? 'REALTIME ERROR'
+                    : 'REALTIME MENGHUBUNGKAN'}
+                </span>
+              </span>
             </div>
             <p className="text-xs text-slate-400 font-medium mt-0.5">
               Kelola turnamen, atur bagan pertandingan, dan update skor secara langsung.
@@ -136,6 +186,16 @@ export default function AdminDashboardPage() {
           >
             <Download className="w-4 h-4 text-cyan-400" />
             <span>Backup Data JSON</span>
+          </button>
+
+          <button
+            onClick={handleSyncToSupabase}
+            disabled={isSyncing}
+            className="px-3.5 py-2.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Sinkronkan data lokal ke database Supabase"
+          >
+            <Database className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Menyinkronkan...' : 'Sync Supabase'}</span>
           </button>
 
           {/* Import JSON Button */}
