@@ -1,9 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Trophy, Shield, Activity, RotateCcw, LogOut } from 'lucide-react';
+import { Trophy, Shield, Activity, Users, LogOut } from 'lucide-react';
 import { useAdminAuth } from '@/lib/authStore';
-import { TournamentService } from '@/lib/tournamentStore';
 
 export default function Navbar() {
   const { isAdmin, logout } = useAdminAuth();
@@ -43,6 +42,13 @@ export default function Navbar() {
               <Activity className="w-4 h-4 text-lime-400" />
               Match Center
             </Link>
+            <Link
+              href="/sparing"
+              className="px-3 py-1.5 rounded-lg text-sm font-semibold text-cyan-200 hover:text-white hover:bg-cyan-500/10 transition-colors flex items-center gap-2"
+            >
+              <Users className="w-4 h-4 text-cyan-400" />
+              Sparing
+            </Link>
             {isAdmin && (
               <Link
                 href="/admin"
@@ -66,6 +72,13 @@ export default function Navbar() {
                 >
                   <Shield className="w-4 h-4 text-amber-400" />
                   <span className="hidden sm:inline">Admin Mode</span>
+                </Link>
+                <Link
+                  href="/sparing"
+                  className="p-2 rounded-lg bg-slate-800 hover:bg-cyan-500/20 text-cyan-300 transition-colors"
+                  title="Kelola Sparing"
+                >
+                  <Users className="w-4 h-4" />
                 </Link>
                 <button
                   onClick={logout}
