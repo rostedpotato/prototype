@@ -203,12 +203,38 @@ export function getMaxSetsForRound(
   return 3; // Default best of 3
 }
 
-export function getTargetGamesForMatch(
+type RulesLike = { maxSets?: number; customPadelScoring?: boolean } | undefined;
+
+/**
+ * Sets-to-win berdasarkan aturan turnamen (template):
+ * - Padel custom: per fase (Grup/QF first to 3, SF 4, Final 6).
+ * - Selain itu: turunan dari rules.maxSets (3 = first to 2, 5 = first to 3, 1 = first to 1).
+ */
+export function getSetsToWinForRules(
+  rules: RulesLike,
   sport: SportType,
-  customPadelScoring: boolean | undefined,
   roundName: string = ''
-): number | undefined {
+): number {
+  if (sport === 'PADEL' && rules?.customPadelScoring) {
+    return getSetsToWinForRound(sport, true, roundName);
+  }
+  return Math.max(1, Math.ceil((rules?.maxSets ?? 3) / 2));
+}
+
+/** Jumlah slot set maksimum berdasarkan aturan turnamen (template). */
+export function getMaxSetsForRules(
+  rules: RulesLike,
+  sport: SportType,
+  roundName: string = ''
+): number {
+  if (sport === 'PADEL' && rules?.customPadelScoring) {
+    return getMaxSetsForRound(sport, true, roundName);
+  }
+  return Math.max(1, rules?.maxSets ?? 3);
+}
+
+export function getTargetGamesForMatch(sport: SportType, pointsPerSet?: number): number | undefined {
   if (sport !== 'PADEL') return undefined;
   // In padel, points/games in each set is standard 6 (first to 6 games per set)
-  return 6;
+  return pointsPerSet && pointsPerSet > 0 ? pointsPerSet : 6;
 }

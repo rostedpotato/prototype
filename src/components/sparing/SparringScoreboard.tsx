@@ -48,12 +48,10 @@ function CommunityScore({
 function MatchRow({
   match,
   matchNo,
-  sparring,
   playerMap,
 }: {
   match: SparringMatch;
   matchNo: number;
-  sparring: Sparring;
   playerMap: Map<string, { id: string; name: string }>;
 }) {
   const playerName = (id: string | null) => (id ? playerMap.get(id)?.name ?? '—' : 'Belum dipilih');
@@ -193,7 +191,6 @@ export default function SparringScoreboard({ sparring }: { sparring: Sparring })
               key={match.id}
               match={match}
               matchNo={index + 1}
-              sparring={sparring}
               playerMap={playerMap}
             />
           ))

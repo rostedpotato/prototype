@@ -32,8 +32,6 @@ const SLOT_DEFS = [
   { key: 'playerB2Id', community: 'B' as CommunitySlot, label: 'Pemain 2' },
 ] as const;
 
-type SlotKey = (typeof SLOT_DEFS)[number]['key'];
-
 function MatchStatusChip({ status }: { status: SparringMatch['status'] }) {
   if (status === 'ONGOING') {
     return (
@@ -122,7 +120,9 @@ function MatchCard({
 
   const draftA = parseScore(scoreDraft.a);
   const draftB = parseScore(scoreDraft.b);
-  const canFinish = match.status === 'ONGOING' && draftA !== null && draftB !== null;
+  // Skor imbang tidak diperbolehkan — match harus punya pemenang.
+  const canFinish =
+    match.status === 'ONGOING' && draftA !== null && draftB !== null && draftA !== draftB;
   const winner = matchWinnerSlot(match);
   const winnerName =
     winner === 'A' ? sparring.communityAName : winner === 'B' ? sparring.communityBName : null;
@@ -315,7 +315,7 @@ function MatchCard({
               <button
                 type="button"
                 onClick={commitScore}
-                disabled={draftA === null || draftB === null}
+                disabled={draftA === null || draftB === null || draftA === draftB}
                 className="rounded-xl bg-lime-500 px-4 py-2.5 text-xs font-black text-slate-950 hover:bg-lime-400 disabled:opacity-40 transition-colors flex items-center gap-1.5"
               >
                 <CheckCircle2 className="w-4 h-4" /> Simpan Skor

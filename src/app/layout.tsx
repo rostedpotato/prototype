@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import Navbar from '@/components/Navbar';
+import SyncErrorToaster from '@/components/SyncErrorToaster';
 import { Analytics } from '@vercel/analytics/react';
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export default function RootLayout({
           </div>
         </footer>
         <Analytics />
+        <SyncErrorToaster />
       </body>
     </html>
   );

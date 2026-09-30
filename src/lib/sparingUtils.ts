@@ -13,11 +13,20 @@ export function sortMatches(matches: SparringMatch[]): SparringMatch[] {
 }
 
 // Status sesi diturunkan dari match-nya: ada match berjalan = LIVE,
-// sudah ada match selesai = COMPLETED, belum ada match = DRAFT.
+// seluruh match selesai (min. satu) = COMPLETED, selain itu = DRAFT
+// (termasuk sesi yang terjeda — sebagian selesai namun tidak ada yang berjalan).
 export function getDisplayStatus(sparring: Sparring): SparringStatus {
   if (sparring.matches.some((match) => match.status === 'ONGOING')) return 'LIVE';
-  if (sparring.matches.some((match) => match.status === 'DONE')) return 'COMPLETED';
+  const hasMatches = sparring.matches.length > 0;
+  const allDone = sparring.matches.every((match) => match.status === 'DONE');
+  if (hasMatches && allDone) return 'COMPLETED';
   return 'DRAFT';
+}
+
+// Sesi dianggap sudah berjalan bila minimal satu match tidak lagi PENDING —
+// dipakai untuk memutuskan apakah perubahan boleh di-auto-save.
+export function isSessionActive(sparring: Sparring): boolean {
+  return sparring.matches.some((match) => match.status !== 'PENDING');
 }
 
 export function hasOngoingMatch(sparring: Sparring): boolean {

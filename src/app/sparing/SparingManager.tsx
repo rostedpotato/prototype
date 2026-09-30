@@ -23,6 +23,7 @@ import {
 import {
   communityRecord,
   getDisplayStatus,
+  isSessionActive,
   normalizeMatchStatus,
   statusLabel,
   statusStyle,
@@ -113,6 +114,9 @@ function validate(sparring: Sparring): string | null {
     if (match.status === 'DONE' && (match.scoreA === null || match.scoreB === null)) {
       return 'Match selesai wajib memiliki skor kedua komunitas.';
     }
+    if (match.status === 'DONE' && match.scoreA === match.scoreB) {
+      return 'Skor match tidak boleh imbang — tentukan pemenangnya.';
+    }
   }
   return null;
 }
@@ -144,11 +148,6 @@ export default function SparingManager() {
     activeSparringRef.current = activeSparring;
   }, [activeSparring]);
 
-  // Pilih sparing lain selalu membuka Papan Skor terlebih dahulu.
-  useEffect(() => {
-    setEditorView('live');
-  }, [activeSparring?.id]);
-
   useEffect(() => {
     let active = true;
     const hydrate = async () => {
@@ -157,6 +156,7 @@ export default function SparingManager() {
         if (active && !hasInitialSelection.current && loaded.length > 0) {
           hasInitialSelection.current = true;
           setActiveSparring(loaded[0]);
+          setEditorView('live');
         }
       } catch (error) {
         if (active) {
@@ -237,8 +237,8 @@ export default function SparingManager() {
     if (autoSaveTimer.current !== null) window.clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = window.setTimeout(() => {
       autoSaveTimer.current = null;
-      const current = activeSparringRef.current;
-      if (!current || getDisplayStatus(current) === 'DRAFT') return;
+    const current = activeSparringRef.current;
+    if (!current || !isSessionActive(current)) return;
       if (isSavingRef.current) {
         scheduleAutoSave();
         return;
@@ -374,6 +374,7 @@ export default function SparingManager() {
             type="button"
             onClick={() => {
               setActiveSparring(newSparring());
+              setEditorView('live');
               isDirtyRef.current = true;
               setIsDirty(true);
               setNotice(null);
@@ -419,6 +420,7 @@ export default function SparingManager() {
                       isDirtyRef.current = false;
                       setIsDirty(false);
                       setActiveSparring(sparring);
+                      setEditorView('live');
                     }}
                     className={`w-full rounded-xl border p-3 text-left transition-colors ${selected ? 'border-lime-400/60 bg-lime-500/10' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`}
                   >

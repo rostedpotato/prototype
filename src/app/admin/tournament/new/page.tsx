@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAdminAuth } from '@/lib/authStore';
 import { TournamentService } from '@/lib/tournamentStore';
+import { loadTemplatesFromSupabase } from '@/lib/supabase/tournamentTemplateRepository';
 import {
   generateBracketMatches,
   generateGroupStageMatches,
@@ -14,6 +15,8 @@ import {
   SportType,
   TournamentCategory,
   TournamentFormat,
+  TournamentRules,
+  TournamentTemplate,
   Participant,
   Tournament,
   Match,
@@ -23,12 +26,18 @@ import {
   Trophy,
   Plus,
   Trash2,
-  Sparkles,
   CheckCircle2,
   Layers,
   Shield,
   Medal,
+  SlidersHorizontal,
 } from 'lucide-react';
+
+function defaultRulesFor(sport: SportType): TournamentRules {
+  return sport === 'PADEL'
+    ? { pointsPerSet: 6, maxSets: 3, deuceMargin: 2 }
+    : { pointsPerSet: 21, maxSets: 3, deuceMargin: 2, maxPointCap: 30 };
+}
 
 
 export default function NewTournamentPage() {
@@ -45,17 +54,58 @@ export default function NewTournamentPage() {
   const [name, setName] = useState('');
   const [format, setFormat] = useState<TournamentFormat>('TWO_STAGE');
   const [sport, setSport] = useState<SportType>('BADMINTON');
-  const [customPadelScoring, setCustomPadelScoring] = useState(false);
   const [category, setCategory] = useState<TournamentCategory>('MEN_DOUBLES');
   const [venue, setVenue] = useState('');
   const [city, setCity] = useState('');
-  const [startDate, setStartDate] = useState('2026-09-01');
-  const [endDate, setEndDate] = useState('2026-09-03');
+  // Default: mulai hari ini, selesai dua hari kemudian
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [endDate, setEndDate] = useState(() => {
+    const end = new Date();
+    end.setDate(end.getDate() + 2);
+    return end.toISOString().slice(0, 10);
+  });
   const [description, setDescription] = useState('');
   const [courtsText, setCourtsText] = useState('Court 1, Court 2, Court 3, Court 4');
 
+  // Template & aturan skoring (dari template yang dipilih, tetap bisa diubah)
+  const [templates, setTemplates] = useState<TournamentTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [rules, setRules] = useState<TournamentRules>(defaultRulesFor('BADMINTON'));
+  const [groupScheduleScheme, setGroupScheduleScheme] = useState<'SPLIT_WAVE' | 'ROLLING_ROUND'>(
+    'SPLIT_WAVE'
+  );
+  const [scheduleStartTime, setScheduleStartTime] = useState('08:00 WIB');
+  const [slotDurationMinutes, setSlotDurationMinutes] = useState(45);
+
   // Participants
   const [participants, setParticipants] = useState<Participant[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    loadTemplatesFromSupabase()
+      .then((loaded) => {
+        if (active) setTemplates(loaded);
+      })
+      .catch((error: unknown) => {
+        console.error('Gagal memuat template turnamen:', error);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const applyTemplate = (template: TournamentTemplate) => {
+    setSelectedTemplateId(template.id);
+    setFormat(template.format);
+    setSport(template.sport);
+    setCategory(template.category);
+    setRules({ ...template.rules });
+    setCourtsText(template.courts.join(', '));
+    setGroupScheduleScheme(template.groupScheduleScheme || 'SPLIT_WAVE');
+    setScheduleStartTime(template.scheduleStartTime);
+    setSlotDurationMinutes(template.slotDurationMinutes);
+    setParticipants([]);
+  };
 
   // When format changes, adjust participant count if they want to pre-fill?
   // No, we let them empty it or they just wait for registration.
@@ -71,7 +121,11 @@ export default function NewTournamentPage() {
 
 
 
-  const handleUpdateParticipant = (index: number, key: keyof Participant, value: any) => {
+  const handleUpdateParticipant = (
+    index: number,
+    key: keyof Participant,
+    value: string | number | undefined
+  ) => {
     const updated = [...participants];
     updated[index] = { ...updated[index], [key]: value };
     setParticipants(updated);
@@ -136,7 +190,10 @@ export default function NewTournamentPage() {
       const result = generateGroupStageMatches(
         tournamentId,
         participants,
-        courts.length > 0 ? courts : ['Court 1', 'Court 2', 'Court 3', 'Court 4']
+        courts.length > 0 ? courts : ['Court 1', 'Court 2', 'Court 3', 'Court 4'],
+        groupScheduleScheme,
+        scheduleStartTime,
+        slotDurationMinutes
       );
       generatedMatches = result.matches;
       finalParticipants = result.groupedParticipants;
@@ -175,10 +232,10 @@ export default function NewTournamentPage() {
       participants: finalParticipants,
       matches: generatedMatches,
       rules: {
-        pointsPerSet: sport === 'BADMINTON' ? 21 : 6,
-        maxSets: 3,
-        deuceMargin: 2,
-        maxPointCap: sport === 'BADMINTON' ? 30 : undefined,
+        pointsPerSet: rules.pointsPerSet,
+        maxSets: rules.maxSets,
+        deuceMargin: rules.deuceMargin,
+        maxPointCap: sport === 'BADMINTON' ? rules.maxPointCap : undefined,
         customPadelScoring: format === 'TWO_STAGE_PADEL_CUSTOM',
       },
       createdAt: new Date().toISOString(),
@@ -218,6 +275,60 @@ export default function NewTournamentPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* TEMPLATE TURNAMEN */}
+          <div className="space-y-3 bg-slate-950/80 border border-slate-800 p-5 rounded-2xl">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="w-5 h-5 text-lime-400" />
+              <h2 className="text-sm font-black text-white uppercase tracking-wider">
+                Mulai dari Template
+              </h2>
+            </div>
+            <p className="text-xs text-slate-400 font-medium">
+              Template mengisi otomatis format, aturan skoring, dan lapangan — semuanya tetap bisa diubah di bawah.
+            </p>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedTemplateId(null)}
+                className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                  selectedTemplateId === null
+                    ? 'bg-lime-500/10 border-lime-400 ring-2 ring-lime-400/30'
+                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <h3 className="text-xs font-black text-white">Mulai dari Nol</h3>
+                <p className="text-[11px] text-slate-400 mt-1 font-medium">
+                  Atur sendiri seluruh aturan di form ini.
+                </p>
+              </button>
+              {templates.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => applyTemplate(t)}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                    selectedTemplateId === t.id
+                      ? 'bg-lime-500/10 border-lime-400 ring-2 ring-lime-400/30'
+                      : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-xs font-black text-white leading-snug">{t.name}</h3>
+                    <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                      {t.sport === 'PADEL' ? 'Padel' : 'Badminton'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
+                    {t.format === 'TWO_STAGE_PADEL_CUSTOM'
+                      ? 'Custom padel: Grup/QF to 3 · SF 4 · Final 6 set'
+                      : `${t.rules.pointsPerSet} poin/set · Best of ${t.rules.maxSets}`}
+                    {t.participantCount ? ` · ${t.participantCount} pasangan` : ''}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* FORMAT PERTANDINGAN SELECTION */}
           <div className="space-y-3 bg-slate-950/80 border border-slate-800 p-5 rounded-2xl">
             <div className="flex items-center gap-2">
@@ -374,6 +485,11 @@ export default function NewTournamentPage() {
                 onChange={(e) => {
                   const s = e.target.value as SportType;
                   setSport(s);
+                  setRules((current) => ({
+                    ...current,
+                    pointsPerSet: s === 'PADEL' ? 6 : 21,
+                    maxPointCap: s === 'BADMINTON' ? 30 : undefined,
+                  }));
                 }}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-lime-400"
               >
@@ -477,6 +593,72 @@ export default function NewTournamentPage() {
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
               />
             </div>
+          </div>
+
+          {/* ATURAN SKORING */}
+          <div className="space-y-3 bg-slate-950/80 border border-slate-800 p-5 rounded-2xl">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-400" />
+              <h2 className="text-sm font-black text-white uppercase tracking-wider">Aturan Skoring</h2>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <label className="text-xs font-bold text-slate-300 block">
+                Poin / Set
+                <input
+                  type="number"
+                  min="1"
+                  value={rules.pointsPerSet}
+                  onChange={(e) => setRules({ ...rules, pointsPerSet: Number.parseInt(e.target.value, 10) || 1 })}
+                  className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-lime-400"
+                />
+              </label>
+              <label className="text-xs font-bold text-slate-300 block">
+                Max Set (Best of N)
+                <select
+                  value={rules.maxSets}
+                  onChange={(e) => setRules({ ...rules, maxSets: Number.parseInt(e.target.value, 10) || 3 })}
+                  className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-lime-400"
+                >
+                  <option value="1">1 (First to 1)</option>
+                  <option value="3">3 (Best of 3)</option>
+                  <option value="5">5 (Best of 5)</option>
+                  <option value="7">7 (Best of 7)</option>
+                </select>
+              </label>
+              <label className="text-xs font-bold text-slate-300 block">
+                Margin Deuce
+                <input
+                  type="number"
+                  min="0"
+                  value={rules.deuceMargin}
+                  onChange={(e) => setRules({ ...rules, deuceMargin: Number.parseInt(e.target.value, 10) || 0 })}
+                  className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-lime-400"
+                />
+              </label>
+              {sport === 'BADMINTON' && (
+                <label className="text-xs font-bold text-slate-300 block">
+                  Cap Poin Maks
+                  <input
+                    type="number"
+                    min="0"
+                    value={rules.maxPointCap ?? ''}
+                    onChange={(e) =>
+                      setRules({
+                        ...rules,
+                        maxPointCap: e.target.value ? Number.parseInt(e.target.value, 10) : undefined,
+                      })
+                    }
+                    className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-lime-400"
+                  />
+                </label>
+              )}
+            </div>
+            {format === 'TWO_STAGE_PADEL_CUSTOM' && (
+              <p className="text-[11px] font-bold text-purple-300">
+                Skoring padel custom aktif: Grup/QF first to 3 set · Semifinal first to 4 · Final first to 6
+                (set {rules.pointsPerSet} game, margin deuce {rules.deuceMargin}).
+              </p>
+            )}
           </div>
 
           {/* Participants Seeding */}

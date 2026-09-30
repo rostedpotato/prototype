@@ -16,8 +16,6 @@ interface LiveScoreCardProps {
 export default function LiveScoreCard({
   match,
   sport,
-  tournamentName,
-  tournamentId,
   onOpenScoreControl,
 }: LiveScoreCardProps) {
   const { isAdmin } = useAdminAuth();

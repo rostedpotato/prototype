@@ -8,6 +8,7 @@ import { useAdminAuth } from '@/lib/authStore';
 import {
   Shield,
   Plus,
+  Layers,
   Trophy,
   Calendar,
   MapPin,
@@ -217,6 +218,13 @@ export default function AdminDashboardPage() {
             className="hidden"
           />
 
+          <Link
+            href="/admin/templates"
+            className="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-bold transition-all flex items-center gap-2"
+          >
+            <Layers className="w-4 h-4 text-cyan-400" />
+            <span>Template</span>
+          </Link>
           <Link
             href="/admin/tournament/new"
             className="px-4 py-2.5 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 text-xs font-black shadow-lg shadow-lime-500/20 transition-all flex items-center gap-2"

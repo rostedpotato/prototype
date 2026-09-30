@@ -82,6 +82,14 @@ export interface Match {
   groupName?: string; // 'Grup 1', 'Grup 2', etc. for group stage matches
 }
 
+export interface TournamentRules {
+  pointsPerSet: number; // 21 for Badminton, 6 for Padel
+  maxSets: number; // 3 = best of 3, 5 = best of 5, dst.
+  deuceMargin: number; // 2 points margin
+  maxPointCap?: number; // 30 for badminton
+  customPadelScoring?: boolean; // Padel best of 5 (Grp/QF: 3, SF: 4, F: 6)
+}
+
 export interface Tournament {
   id: string;
   name: string;
@@ -98,13 +106,7 @@ export interface Tournament {
   bannerUrl?: string;
   participants: Participant[];
   matches: Match[];
-  rules: {
-    pointsPerSet: number; // 21 for Badminton, 6 for Padel
-    maxSets: number; // usually 3 (best of 3)
-    deuceMargin: number; // 2 points margin
-    maxPointCap?: number; // 30 for badminton
-    customPadelScoring?: boolean; // Padel best of 5 (Grp/QF: 3, SF: 4, F: 6)
-  };
+  rules: TournamentRules;
   // For Two-Stage Tournament
   format?: TournamentFormat; // 'KNOCKOUT' or 'TWO_STAGE'
   groupStageCompleted?: boolean; // Whether group stage is finished
@@ -114,3 +116,22 @@ export interface Tournament {
 }
 
 export type GroupScheduleScheme = 'SPLIT_WAVE' | 'ROLLING_ROUND';
+
+// Template turnamen: sekumpulan aturan yang dapat dipakai ulang saat membuat
+// turnamen baru (format, skoring, jumlah peserta, lapangan, jadwal slot).
+export interface TournamentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  sport: SportType;
+  format: TournamentFormat;
+  category: TournamentCategory;
+  rules: TournamentRules;
+  participantCount?: number | null; // target jumlah pasangan (null = bebas)
+  courts: string[];
+  groupScheduleScheme?: GroupScheduleScheme | null;
+  scheduleStartTime: string; // contoh: '08:00 WIB'
+  slotDurationMinutes: number;
+  isBuiltin: boolean; // template bawaan tidak dapat dihapus
+  createdAt: string;
+}

@@ -1,12 +1,27 @@
 'use client';
 
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, Crown } from 'lucide-react';
 import type { CommunitySlot, Sparring } from '@/types/sparing';
 import { getPlayerStatRows, sortMatches } from '@/lib/sparingUtils';
+import type { PlayerStatRow } from '@/lib/sparingUtils';
+
+function pickMvpRow(rows: PlayerStatRow[]): PlayerStatRow | null {
+  const eligible = rows.filter((row) => row.played > 0);
+  if (eligible.length === 0) return null;
+
+  return [...eligible].sort(
+    (a, b) =>
+      b.wins - a.wins ||
+      b.cells.reduce((total, cell) => total + (cell.score ?? 0), 0) -
+        a.cells.reduce((total, cell) => total + (cell.score ?? 0), 0) ||
+      b.played - a.played
+  )[0];
+}
 
 function CommunityStatsTable({ sparring, community }: { sparring: Sparring; community: CommunitySlot }) {
   const matches = sortMatches(sparring.matches);
   const rows = getPlayerStatRows(sparring, community);
+  const mvpId = pickMvpRow(rows)?.player.id ?? null;
   const communityName =
     community === 'A' ? sparring.communityAName : sparring.communityBName;
 
@@ -56,6 +71,14 @@ function CommunityStatsTable({ sparring, community }: { sparring: Sparring; comm
                 <tr key={row.player.id} className="border-t border-slate-800">
                   <td className="px-3 py-2 whitespace-nowrap">
                     <span className="text-xs font-extrabold text-white">{row.player.name}</span>
+                    {row.player.id === mvpId && (
+                      <span
+                        className="ml-1.5 inline-flex items-center gap-1 rounded-md bg-amber-500/15 border border-amber-500/40 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-300 align-middle"
+                        title="MVP komunitas: menang terbanyak (tie-break poin)"
+                      >
+                        <Crown className="w-3 h-3" /> MVP
+                      </span>
+                    )}
                     {row.player.level && (
                       <span className="ml-1.5 text-[9px] font-bold uppercase text-slate-500">
                         {row.player.level}

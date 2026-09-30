@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Match, SetScore, MatchStatus, SportType, Participant } from '@/types/tournament';
 import { TournamentService, useTournament } from '@/lib/tournamentStore';
 import { useAdminAuth } from '@/lib/authStore';
 import {
   checkSetStatus,
   calculateMatchWinner,
-  getSetsToWinForRound,
-  getMaxSetsForRound,
+  getSetsToWinForRules,
+  getMaxSetsForRules,
   getTargetGamesForMatch,
 } from '@/lib/scoreRules';
 import {
@@ -20,7 +20,6 @@ import {
   CircleDot,
   Users,
   Sparkles,
-  AlertTriangle,
   RotateCcw,
   Flag,
 } from 'lucide-react';
@@ -117,9 +116,9 @@ export default function AdminScoringModal({
   const { tournament } = useTournament(tournamentId);
   const { isAdmin } = useAdminAuth();
 
-  const setsToWin = getSetsToWinForRound(sport, tournament?.rules?.customPadelScoring, match?.roundName || '');
-  const maxSets = getMaxSetsForRound(sport, tournament?.rules?.customPadelScoring, match?.roundName || '');
-  const targetGames = getTargetGamesForMatch(sport, tournament?.rules?.customPadelScoring, match?.roundName || '');
+  const setsToWin = getSetsToWinForRules(tournament?.rules, sport, match?.roundName || '');
+  const maxSets = getMaxSetsForRules(tournament?.rules, sport, match?.roundName || '');
+  const targetGames = getTargetGamesForMatch(sport, tournament?.rules?.pointsPerSet);
 
   const [activeSet, setActiveSet] = useState<number>(1);
   const [scores, setScores] = useState<SetScore[]>([]);
@@ -134,27 +133,30 @@ export default function AdminScoringModal({
   const [p1Id, setP1Id] = useState<string>('');
   const [p2Id, setP2Id] = useState<string>('');
 
-  useEffect(() => {
-    if (match) {
-      setActiveSet(match.currentSet || 1);
-      const loadedScores: SetScore[] = match.scores && match.scores.length > 0 
-        ? match.scores.map(s => ({ ...s })) 
+  // Inisialisasi ulang state editor setiap kali match yang dibedah berganti
+  // (render-phase adjust — tanpa effect).
+  const [initializedFor, setInitializedFor] = useState<string | null>(null);
+  if (match && initializedFor !== match.id) {
+    setInitializedFor(match.id);
+    setActiveSet(match.currentSet || 1);
+    const loadedScores: SetScore[] =
+      match.scores && match.scores.length > 0
+        ? match.scores.map((s) => ({ ...s }))
         : Array.from({ length: maxSets }, (_, i) => ({ setNumber: i + 1, score1: 0, score2: 0 }));
-      
-      while (loadedScores.length < maxSets) {
-        loadedScores.push({ setNumber: loadedScores.length + 1, score1: 0, score2: 0 });
-      }
-      setScores(loadedScores);
-      setStatus(match.status);
-      setServingSide(match.servingSide || 1);
-      setWinnerId(match.winnerId || null);
-      setCourt(match.court || 'Court 1');
-      setReferee(match.referee || '');
-      setScheduledTime(match.scheduledTime || '09:00 WIB');
-      setP1Id(match.participant1?.id || '');
-      setP2Id(match.participant2?.id || '');
+
+    while (loadedScores.length < maxSets) {
+      loadedScores.push({ setNumber: loadedScores.length + 1, score1: 0, score2: 0 });
     }
-  }, [match, maxSets]);
+    setScores(loadedScores);
+    setStatus(match.status);
+    setServingSide(match.servingSide || 1);
+    setWinnerId(match.winnerId || null);
+    setCourt(match.court || 'Court 1');
+    setReferee(match.referee || '');
+    setScheduledTime(match.scheduledTime || '09:00 WIB');
+    setP1Id(match.participant1?.id || '');
+    setP2Id(match.participant2?.id || '');
+  }
 
   if (!isOpen || !match || !tournament || !isAdmin) return null;
 

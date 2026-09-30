@@ -1,14 +1,12 @@
 'use client';
 
 import { useTournaments } from '@/lib/tournamentStore';
-import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 export default function GlobalRegisterPage() {
   const { tournaments, isClient, service } = useTournaments();
-  const router = useRouter();
 
   const [formData, setFormData] = useState({
     tournamentId: '',
@@ -106,7 +104,7 @@ export default function GlobalRegisterPage() {
       } else {
         setError('Gagal mengirim pendaftaran. Silakan coba lagi.');
       }
-    } catch (err) {
+    } catch {
       setError('Terjadi kesalahan yang tidak terduga.');
     } finally {
       setIsSubmitting(false);

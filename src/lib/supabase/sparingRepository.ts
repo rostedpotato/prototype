@@ -250,6 +250,19 @@ export async function deleteSparringFromSupabase(sparringId: string): Promise<vo
   }
 }
 
+// Debounce notifikasi realtime: satu simpan menyentuh beberapa tabel, cukup
+// satu kali refresh.
+const REALTIME_DEBOUNCE_MS = 600;
+let realtimeNotifyTimer: ReturnType<typeof setTimeout> | null = null;
+
+function notifyListenersDebounced() {
+  if (realtimeNotifyTimer) clearTimeout(realtimeNotifyTimer);
+  realtimeNotifyTimer = setTimeout(() => {
+    realtimeNotifyTimer = null;
+    realtimeListeners.forEach((listener) => listener());
+  }, REALTIME_DEBOUNCE_MS);
+}
+
 function ensureRealtimeChannel() {
   if (realtimeChannel) return;
 
@@ -258,17 +271,17 @@ function ensureRealtimeChannel() {
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'sparrings' },
-      () => realtimeListeners.forEach((listener) => listener())
+      () => notifyListenersDebounced()
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'sparring_players' },
-      () => realtimeListeners.forEach((listener) => listener())
+      () => notifyListenersDebounced()
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'sparring_matches' },
-      () => realtimeListeners.forEach((listener) => listener())
+      () => notifyListenersDebounced()
     )
     .subscribe();
 }

@@ -4,19 +4,15 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTournament } from '@/lib/tournamentStore';
-import { getMatchSetsSummary, getActiveSets } from '@/lib/standingUtils';
+import { getMatchSetsSummary } from '@/lib/standingUtils';
 import { Match } from '@/types/tournament';
 import {
   Trophy,
-  Clock,
   Maximize2,
   Minimize2,
   ArrowLeft,
-  CircleDot,
   Radio,
   Flame,
-  Calendar,
-  Users,
 } from 'lucide-react';
 
 export default function TournamentTVDisplayPage() {
@@ -170,7 +166,6 @@ export default function TournamentTVDisplayPage() {
             const isFinished = activeMatch?.status === 'FINISHED';
             const isWalkover = activeMatch?.status === 'WALKOVER';
             const { setsWon1, setsWon2 } = getMatchSetsSummary(activeMatch?.scores);
-            const activeSets = getActiveSets(activeMatch?.scores);
 
             return (
               <div

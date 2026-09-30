@@ -227,16 +227,24 @@ export async function loadTournamentsFromSupabase(): Promise<Tournament[]> {
   if (rows.length === 0) return [];
 
   const tournamentIds = rows.map((row) => asString(row.id));
-  const [participantRows, matchResult, scoreResult, registrationResult] = await Promise.all([
+  const [participantRows, matchResult, registrationResult] = await Promise.all([
     loadParticipants(tournamentIds),
     supabase.from('matches').select('*').in('tournament_id', tournamentIds).order('match_order'),
-    supabase.from('match_scores').select('*'),
     supabase.from('registrations').select('*').in('tournament_id', tournamentIds).order('created_at'),
   ]);
 
   if (matchResult.error) {
     console.warn('Supabase tabel matches tidak dapat dibaca:', errorMessage(matchResult.error));
   }
+
+  // Skor hanya diambil untuk match yang relevan (bukan seluruh tabel).
+  const matchRows = (matchResult.data || []) as DatabaseRow[];
+  const matchIds = matchRows.map((row) => asString(row.id)).filter(Boolean);
+  const scoreResult =
+    matchIds.length > 0
+      ? await supabase.from('match_scores').select('*').in('match_id', matchIds)
+      : { data: [] as DatabaseRow[], error: null };
+
   if (scoreResult.error) {
     console.warn('Supabase tabel match_scores tidak dapat dibaca:', errorMessage(scoreResult.error));
   }
@@ -246,7 +254,7 @@ export async function loadTournamentsFromSupabase(): Promise<Tournament[]> {
   const registrationRows = registrationResult.error
     ? []
     : ((registrationResult.data || []) as DatabaseRow[]);
-  const matches = (matchResult.data || []) as DatabaseRow[];
+  const matches = matchRows;
   const scores = (scoreResult.data || []) as DatabaseRow[];
   const participantsByTournament = new Map<string, DatabaseRow[]>();
   const matchesByTournament = new Map<string, DatabaseRow[]>();
@@ -595,6 +603,19 @@ export async function deleteTournamentFromSupabase(tournamentId: string): Promis
   }
 }
 
+// Satu kali simpan memicu event di beberapa tabel; debounce agar pembaruan
+// data cukup dijalankan satu kali, bukan sekali per tabel.
+const REALTIME_DEBOUNCE_MS = 600;
+let realtimeNotifyTimer: ReturnType<typeof setTimeout> | null = null;
+
+function notifyListenersDebounced() {
+  if (realtimeNotifyTimer) clearTimeout(realtimeNotifyTimer);
+  realtimeNotifyTimer = setTimeout(() => {
+    realtimeNotifyTimer = null;
+    realtimeListeners.forEach((listener) => listener());
+  }, REALTIME_DEBOUNCE_MS);
+}
+
 function ensureRealtimeChannel() {
   if (realtimeChannel) return;
 
@@ -604,27 +625,27 @@ function ensureRealtimeChannel() {
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'tournaments' },
-      () => realtimeListeners.forEach((listener) => listener())
+      () => notifyListenersDebounced()
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'registrations' },
-      () => realtimeListeners.forEach((listener) => listener())
+      () => notifyListenersDebounced()
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'participants' },
-      () => realtimeListeners.forEach((listener) => listener())
+      () => notifyListenersDebounced()
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'matches' },
-      () => realtimeListeners.forEach((listener) => listener())
+      () => notifyListenersDebounced()
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'match_scores' },
-      () => realtimeListeners.forEach((listener) => listener())
+      () => notifyListenersDebounced()
     )
     .subscribe((status, error) => {
       if (status === 'SUBSCRIBED') {

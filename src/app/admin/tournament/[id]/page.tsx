@@ -22,7 +22,6 @@ import {
   Lock,
   Shield,
   Sparkles,
-  RotateCcw,
   Tv,
 } from 'lucide-react';
 
@@ -39,11 +38,16 @@ export default function AdminTournamentManagePage() {
   const [scheduleConfigMode, setScheduleConfigMode] = useState<'GENERATE' | 'RESCHEDULE'>('GENERATE');
 
   // Auto set to GROUP tab if TWO_STAGE and not yet group stage completed
-  useEffect(() => {
-    if (tournament?.format?.startsWith('TWO_STAGE') && !tournament.groupStageCompleted) {
-      setActiveTab('GROUP');
-    }
-  }, [tournament?.format, tournament?.groupStageCompleted]);
+  // (render-phase adjust — sekali per tournament id)
+  const [autoGroupAppliedFor, setAutoGroupAppliedFor] = useState<string | null>(null);
+  if (
+    tournament?.format?.startsWith('TWO_STAGE') &&
+    !tournament.groupStageCompleted &&
+    autoGroupAppliedFor !== tournament.id
+  ) {
+    setAutoGroupAppliedFor(tournament.id);
+    setActiveTab('GROUP');
+  }
 
   useEffect(() => {
     if (isReady && !isAdmin) {

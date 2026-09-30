@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTournament } from '@/lib/tournamentStore';
@@ -33,11 +33,16 @@ export default function TournamentDetailPage() {
   const [scoringModalMatch, setScoringModalMatch] = useState<Match | null>(null);
 
   // Auto set to GROUP tab if TWO_STAGE and not yet group stage completed
-  useEffect(() => {
-    if (tournament?.format?.startsWith('TWO_STAGE') && !tournament.groupStageCompleted) {
-      setActiveTab('GROUP');
-    }
-  }, [tournament?.format, tournament?.groupStageCompleted]);
+  // (render-phase adjust — sekali per tournament id)
+  const [autoGroupAppliedFor, setAutoGroupAppliedFor] = useState<string | null>(null);
+  if (
+    tournament?.format?.startsWith('TWO_STAGE') &&
+    !tournament.groupStageCompleted &&
+    autoGroupAppliedFor !== tournament.id
+  ) {
+    setAutoGroupAppliedFor(tournament.id);
+    setActiveTab('GROUP');
+  }
 
   if (!tournament) {
     return (

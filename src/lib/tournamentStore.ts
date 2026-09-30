@@ -1,8 +1,8 @@
 'use client';
 
-import { Tournament, Match, SetScore, MatchStatus, Participant } from '@/types/tournament';
+import { Tournament, SetScore, MatchStatus, Participant } from '@/types/tournament';
 import { INITIAL_TOURNAMENTS } from './initialData';
-import { calculateMatchWinner, getSetsToWinForRound, getTargetGamesForMatch } from './scoreRules';
+import { calculateMatchWinner, getSetsToWinForRules, getTargetGamesForMatch } from './scoreRules';
 import { calculateGroupStandings } from './standingUtils';
 import { generateKnockoutStageFromGroups } from './bracketGenerator';
 import {
@@ -41,7 +41,7 @@ let syncChannel: BroadcastChannel | null = null;
 if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
   try {
     syncChannel = new BroadcastChannel('racket_tournament_channel');
-  } catch (e) {
+  } catch {
     syncChannel = null;
   }
 }
@@ -126,8 +126,18 @@ async function getResolvedRemoteTournaments(): Promise<Tournament[] | null> {
   const legacyTournaments = getLegacyTournaments();
 
   if (remoteTournaments.length === 0) {
-    if (!legacyTournaments || !(await isCurrentUserAdmin())) {
-      return legacyTournaments ? null : [];
+    // Database kosong adalah keadaan yang sah (semua turnamen memang sudah
+    // dihapus). Jangan pernah membangkitkan cache lokal ke database —
+    // migrasi sekali-jalan dari data pra-Supabase adalah satu-satunya
+    // pengecualian, dan hanya untuk admin.
+    const canMigrateLegacy =
+      !isLegacyMigrationComplete() &&
+      !!legacyTournaments &&
+      legacyTournaments.length > 0 &&
+      (await isCurrentUserAdmin());
+
+    if (!canMigrateLegacy) {
+      return [];
     }
 
     await saveTournamentsToSupabase(legacyTournaments);
@@ -166,7 +176,7 @@ function saveTournaments(tournaments: Tournament[], syncRemote = true) {
 
     if (syncRemote) {
       void saveTournamentsToSupabase(tournaments).catch((error: unknown) => {
-        console.error('Gagal menyinkronkan turnamen ke Supabase:', error);
+        notifySyncError('Gagal menyinkronkan turnamen ke Supabase', error);
       });
     }
   } catch (e) {
@@ -174,13 +184,25 @@ function saveTournaments(tournaments: Tournament[], syncRemote = true) {
   }
 }
 
+// Perubahan lokal disimpan instan (UI responsif), lalu disinkronkan ke
+// Supabase. Karena sinkronisasi berjalan di latar, kegagalannya disiarkan
+// lewat event agar UI admin tetap menampilkan bahwa data BELUM tersimpan.
+export const TOURNAMENT_SYNC_ERROR_EVENT = 'racket:sync-error';
+
+function notifySyncError(context: string, error: unknown) {
+  console.error(context, error);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent(TOURNAMENT_SYNC_ERROR_EVENT, {
+        detail: `${context}: ${describeStoreError(error)}`,
+      })
+    );
+  }
+}
+
 function syncTournamentToSupabase(tournament: Tournament) {
   void saveTournamentsToSupabase([tournament]).catch((error: unknown) => {
-    console.error(
-      `Gagal menyinkronkan tournament ${tournament.id} ke Supabase:`,
-      describeStoreError(error),
-      error
-    );
+    notifySyncError(`Gagal menyinkronkan tournament ${tournament.id} ke Supabase`, error);
   });
 }
 
@@ -300,11 +322,9 @@ export const TournamentService = {
       });
     }
 
-    // FORCE SYNC: Self-healing to ensure participants array perfectly matches APPROVED registrations
-    if (t.registrations && t.registrations.length > 0) {
-      const approvedTeamNames = new Set(t.registrations.filter(r => r.status === 'APPROVED').map(r => r.teamName));
-      t.participants = t.participants.filter(p => approvedTeamNames.has(p.name));
-    }
+    // CATATAN: peserta yang dibuat manual (bukan dari registrasi) tidak boleh
+    // ikut terhapus di sini — penambahan/penghapusan peserta registrasi sudah
+    // ditangani presisi lewat registrationId pada blok di atas.
 
     list[index] = t;
     saveTournaments(list, false);
@@ -317,7 +337,7 @@ export const TournamentService = {
     const filtered = list.filter((t) => t.id !== id);
     saveTournaments(filtered, false);
     void deleteTournamentFromSupabase(id).catch((error: unknown) => {
-      console.error('Gagal menghapus turnamen dari Supabase:', error);
+      notifySyncError('Gagal menghapus turnamen dari Supabase', error);
     });
     return true;
   },
@@ -326,7 +346,7 @@ export const TournamentService = {
     if (typeof window !== 'undefined') {
       try {
         saveTournaments(INITIAL_TOURNAMENTS, true);
-      } catch (e) {
+      } catch {
         // localStorage may be full or disabled - silent fallback
       }
     }
@@ -340,7 +360,7 @@ export const TournamentService = {
 
   importData(data: string | Tournament[]): { success: boolean; count?: number; error?: string } {
     try {
-      let parsed: any;
+      let parsed: unknown;
       if (typeof data === 'string') {
         parsed = JSON.parse(data);
       } else {
@@ -351,23 +371,27 @@ export const TournamentService = {
         return { success: false, error: 'Format data tidak valid (harus berupa array turnamen).' };
       }
 
-      const isValid = parsed.every(
+      const list = parsed as unknown[];
+      const isValid = list.every(
         (t) =>
           t &&
-          typeof t.id === 'string' &&
-          typeof t.name === 'string' &&
-          Array.isArray(t.matches) &&
-          Array.isArray(t.participants)
+          typeof (t as Tournament).id === 'string' &&
+          typeof (t as Tournament).name === 'string' &&
+          Array.isArray((t as Tournament).matches) &&
+          Array.isArray((t as Tournament).participants)
       );
 
       if (!isValid) {
         return { success: false, error: 'Struktur data turnamen dalam file tidak sesuai.' };
       }
 
-      saveTournaments(parsed, true);
-      return { success: true, count: parsed.length };
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Gagal memproses file JSON.' };
+      saveTournaments(list as Tournament[], true);
+      return { success: true, count: list.length };
+    } catch (e) {
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : 'Gagal memproses file JSON.',
+      };
     }
   },
 
@@ -432,20 +456,16 @@ export const TournamentService = {
 
     // Capture the ORIGINAL winnerId before applying payload, needed for revert logic
     const originalWinnerId = matches[mIndex].winnerId;
-    let currentMatch = { ...matches[mIndex], ...payload };
+    const currentMatch = { ...matches[mIndex], ...payload };
 
     // Auto-detect match winner if scores dictate it
     if (payload.scores) {
-      const setsToWin = getSetsToWinForRound(
+      const setsToWin = getSetsToWinForRules(
+        tournament.rules,
         tournament.sport,
-        tournament.rules?.customPadelScoring,
         currentMatch.roundName
       );
-      const targetGames = getTargetGamesForMatch(
-        tournament.sport,
-        tournament.rules?.customPadelScoring,
-        currentMatch.roundName
-      );
+      const targetGames = getTargetGamesForMatch(tournament.sport, tournament.rules?.pointsPerSet);
 
       const winCheck = calculateMatchWinner(tournament.sport, payload.scores, setsToWin, targetGames);
       if (winCheck.isMatchOver && winCheck.winnerSide) {
