@@ -192,14 +192,21 @@ function tournamentFromRows(
 async function loadParticipants(tournamentIds: string[]): Promise<DatabaseRow[]> {
   if (tournamentIds.length === 0) return [];
 
-  // Admins can read the full table. Anonymous visitors fall back to the safe view
-  // which intentionally omits WhatsApp and Reclub IDs.
-  const fullResult = await supabase
-    .from('participants')
-    .select('*')
-    .in('tournament_id', tournamentIds);
+  // Admins can read the full table. Check session first so anonymous visitors
+  // directly read the safe public view without triggering a 401/403 network error.
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData?.session) {
+      const fullResult = await supabase
+        .from('participants')
+        .select('*')
+        .in('tournament_id', tournamentIds);
 
-  if (!fullResult.error) return (fullResult.data || []) as DatabaseRow[];
+      if (!fullResult.error) return (fullResult.data || []) as DatabaseRow[];
+    }
+  } catch {
+    // Fall back to safe public view
+  }
 
   const publicResult = await supabase
     .from('public_participants')
@@ -211,6 +218,56 @@ async function loadParticipants(tournamentIds: string[]): Promise<DatabaseRow[]>
     return [];
   }
   return (publicResult.data || []) as DatabaseRow[];
+}
+
+export async function loadSingleTournamentFromSupabase(id: string): Promise<Tournament | null> {
+  const tournamentResult = await supabase
+    .from('tournaments')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (tournamentResult.error) {
+    throw repositoryError(`Gagal membaca turnamen ${id}`, tournamentResult.error);
+  }
+
+  if (!tournamentResult.data) return null;
+  const row = tournamentResult.data as DatabaseRow;
+
+  const [participantRows, matchResult, registrationResult] = await Promise.all([
+    loadParticipants([id]),
+    supabase.from('matches').select('*').eq('tournament_id', id).order('match_order'),
+    supabase.from('registrations').select('*').eq('tournament_id', id).order('created_at'),
+  ]);
+
+  if (matchResult.error) {
+    console.warn(`Supabase tabel matches tidak dapat dibaca untuk ${id}:`, errorMessage(matchResult.error));
+  }
+
+  const matchRows = (matchResult.data || []) as DatabaseRow[];
+  const matchIds = matchRows.map((r) => asString(r.id)).filter(Boolean);
+
+  const scoreResult =
+    matchIds.length > 0
+      ? await supabase.from('match_scores').select('*').in('match_id', matchIds)
+      : { data: [] as DatabaseRow[], error: null };
+
+  if (scoreResult.error) {
+    console.warn(`Supabase tabel match_scores tidak dapat dibaca untuk ${id}:`, errorMessage(scoreResult.error));
+  }
+
+  const registrationRows = registrationResult.error
+    ? []
+    : ((registrationResult.data || []) as DatabaseRow[]);
+  const scores = (scoreResult.data || []) as DatabaseRow[];
+
+  return tournamentFromRows(
+    row,
+    participantRows,
+    matchRows,
+    scores,
+    registrationRows
+  );
 }
 
 export async function loadTournamentsFromSupabase(): Promise<Tournament[]> {

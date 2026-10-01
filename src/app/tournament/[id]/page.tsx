@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useTournament } from '@/lib/tournamentStore';
+import { useTournament, useRealtimeStatus } from '@/lib/tournamentStore';
 import { useAdminAuth } from '@/lib/authStore';
 import BracketViewer from '@/components/BracketViewer';
 import MatchList from '@/components/MatchList';
@@ -28,6 +28,7 @@ export default function TournamentDetailPage() {
   const id = params.id as string;
   const { tournament } = useTournament(id);
   const { isAdmin } = useAdminAuth();
+  const realtimeStatus = useRealtimeStatus();
 
   const [activeTab, setActiveTab] = useState<'GROUP' | 'BRACKET' | 'MATCHES' | 'PARTICIPANTS'>('BRACKET');
   const [scoringModalMatch, setScoringModalMatch] = useState<Match | null>(null);
@@ -106,6 +107,21 @@ export default function TournamentDetailPage() {
                 {liveMatches.length} Match LIVE
               </span>
             )}
+
+            {realtimeStatus === 'CONNECTED' ? (
+              <span
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-xs"
+                title="Skor dan bagan terhubung secara live realtime. Tidak perlu refresh browser."
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Live Sync Aktif
+              </span>
+            ) : realtimeStatus === 'CONNECTING' ? (
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold text-xs">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                Menghubungkan Live...
+              </span>
+            ) : null}
           </div>
 
           <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
@@ -115,6 +131,11 @@ export default function TournamentDetailPage() {
           <p className="text-xs sm:text-sm text-slate-300 font-medium max-w-3xl leading-relaxed">
             {tournament.description}
           </p>
+
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-lime-400 inline-block" />
+            <span>⚡ <strong>Real-time Auto-Update:</strong> Bagan dan skor langsung diperbarui secara otomatis. Anda tidak perlu me-refresh halaman.</span>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs text-slate-300">
             <div className="flex items-center gap-2 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
