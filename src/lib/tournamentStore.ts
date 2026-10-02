@@ -10,6 +10,7 @@ import {
   getRealtimeStatus,
   insertRegistrationToSupabase,
   isCurrentUserAdmin,
+  loadSingleTournamentFromSupabase,
   loadTournamentsFromSupabase,
   saveTournamentsToSupabase,
   subscribeToRealtimeStatus,
@@ -71,6 +72,19 @@ function cacheTournaments(tournaments: Tournament[]) {
   inMemoryTournaments = tournaments;
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tournaments));
+}
+
+function cacheSingleTournament(tournament: Tournament) {
+  const current = getStoredTournaments();
+  const index = current.findIndex((t) => t.id === tournament.id);
+  let updated: Tournament[];
+  if (index >= 0) {
+    updated = [...current];
+    updated[index] = tournament;
+  } else {
+    updated = [tournament, ...current];
+  }
+  cacheTournaments(updated);
 }
 
 function isLegacyMigrationComplete(): boolean {
@@ -161,6 +175,20 @@ async function getResolvedRemoteTournaments(): Promise<Tournament[] | null> {
 
   markLegacyMigrationComplete();
   return loadTournamentsFromSupabase();
+}
+
+async function getResolvedRemoteTournament(id: string): Promise<Tournament | null> {
+  try {
+    const remote = await loadSingleTournamentFromSupabase(id);
+    if (remote) {
+      return remote;
+    }
+  } catch (error) {
+    console.warn(`Gagal memuat detail turnamen ${id} dari Supabase:`, describeStoreError(error));
+  }
+
+  const legacyTournaments = getLegacyTournaments();
+  return legacyTournaments?.find((item) => item.id === id) || null;
 }
 
 function saveTournaments(tournaments: Tournament[], syncRemote = true) {
@@ -633,11 +661,20 @@ export function useRealtimeStatus(): RealtimeConnectionStatus {
 }
 
 export function useTournaments() {
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>(() => {
+    return TournamentService.getAll();
+  });
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+
+    // Fast-path: display cached tournaments immediately
+    const initial = TournamentService.getAll();
+    if (initial.length > 0 && !cancelled) {
+      setTournaments(initial);
+      setIsClient(true);
+    }
 
     const hydrate = async () => {
       try {
@@ -679,17 +716,22 @@ export function useTournaments() {
       syncChannel.addEventListener('message', handleUpdate);
     }
 
+    // Jittered realtime refresh to prevent stampede across concurrent viewers
     const unsubscribeRealtime = subscribeToTournamentChanges(() => {
-      void getResolvedRemoteTournaments()
-        .then((remoteTournaments) => {
-          if (!cancelled && remoteTournaments) {
-            cacheTournaments(remoteTournaments);
-            setTournaments(remoteTournaments);
-          }
-        })
-        .catch((error: unknown) => {
-          console.error('Realtime refresh tournament gagal:', describeStoreError(error), error);
-        });
+      const jitterMs = Math.floor(Math.random() * 600);
+      setTimeout(() => {
+        if (cancelled) return;
+        void getResolvedRemoteTournaments()
+          .then((remoteTournaments) => {
+            if (!cancelled && remoteTournaments) {
+              cacheTournaments(remoteTournaments);
+              setTournaments(remoteTournaments);
+            }
+          })
+          .catch((error: unknown) => {
+            console.error('Realtime refresh tournament gagal:', describeStoreError(error), error);
+          });
+      }, jitterMs);
     });
 
     return () => {
@@ -707,20 +749,28 @@ export function useTournaments() {
 }
 
 export function useTournament(id: string) {
-  const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [tournament, setTournament] = useState<Tournament | null>(() => {
+    return TournamentService.getById(id);
+  });
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
+    // Fast-path: show cached tournament immediately (0ms blank screen)
+    const cached = TournamentService.getById(id);
+    if (cached && !cancelled) {
+      setTournament(cached);
+      setIsClient(true);
+    }
+
     const hydrate = async () => {
       try {
-        const remoteTournaments = await getResolvedRemoteTournaments();
+        const remoteTournament = await getResolvedRemoteTournament(id);
 
-        if (remoteTournaments) {
-          const remoteTournament = remoteTournaments.find((item) => item.id === id) || null;
+        if (remoteTournament) {
           if (!cancelled) {
-            cacheTournaments(remoteTournaments);
+            cacheSingleTournament(remoteTournament);
             setTournament(remoteTournament);
             setIsClient(true);
           }
@@ -733,7 +783,7 @@ export function useTournament(id: string) {
           setIsClient(true);
         }
       } catch (error) {
-        console.error('Gagal memuat turnamen dari Supabase:', describeStoreError(error), error);
+        console.error('Gagal memuat detail turnamen dari Supabase:', describeStoreError(error), error);
         if (!cancelled) {
           setTournament(TournamentService.getById(id));
           setIsClient(true);
@@ -754,17 +804,22 @@ export function useTournament(id: string) {
       syncChannel.addEventListener('message', handleUpdate);
     }
 
+    // Jittered realtime refresh that fetches ONLY this single tournament, avoiding stampede
     const unsubscribeRealtime = subscribeToTournamentChanges(() => {
-      void getResolvedRemoteTournaments()
-        .then((remoteTournaments) => {
-          if (!cancelled && remoteTournaments) {
-            cacheTournaments(remoteTournaments);
-            setTournament(remoteTournaments.find((item) => item.id === id) || null);
-          }
-        })
-        .catch((error: unknown) => {
-          console.error('Realtime refresh tournament gagal:', describeStoreError(error), error);
-        });
+      const jitterMs = Math.floor(Math.random() * 500);
+      setTimeout(() => {
+        if (cancelled) return;
+        void getResolvedRemoteTournament(id)
+          .then((remoteTournament) => {
+            if (!cancelled && remoteTournament) {
+              cacheSingleTournament(remoteTournament);
+              setTournament(remoteTournament);
+            }
+          })
+          .catch((error: unknown) => {
+            console.error('Realtime refresh tournament gagal:', describeStoreError(error), error);
+          });
+      }, jitterMs);
     });
 
     return () => {
