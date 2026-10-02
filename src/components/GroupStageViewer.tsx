@@ -29,10 +29,15 @@ export default function GroupStageViewer({
   const { isAdmin } = useAdminAuth();
   const [selectedGroupTab, setSelectedGroupTab] = useState<string>('ALL');
 
-  const groups = ['Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'];
+  const groups = [...new Set(tournament.participants.map((p) => p.group).filter((g): g is string => Boolean(g)))];
+  const poolLabel = (groupName: string) => {
+    const index = groups.indexOf(groupName);
+    return index >= 0 ? `Pool ${String.fromCharCode(65 + index)}` : groupName;
+  };
 
   // Filter group matches
   const groupMatches = tournament.matches.filter((m) => m.phase === 'GROUP');
+  const allGroupsComplete = groupMatches.length > 0 && groupMatches.every((m) => m.status === 'FINISHED' || m.status === 'WALKOVER');
 
   const handleGenerateKnockout = () => {
     if (
@@ -55,12 +60,12 @@ export default function GroupStageViewer({
               Sistem Turnamen Dua Tahap (Two-Stage Tournament)
             </div>
             <h3 className="text-xl font-black text-white">
-              Fase 1: Round Robin (4 Grup) ➔ Fase 2: 2 Bagan Knockout (Mulai dari QF)
+              Fase 1: Round Robin ({groups.length} Pool) ➔ Fase 2: Upper & Beginner Knockout
             </h3>
             <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-              16 Pasangan bertanding di 4 grup. 2 Peringkat teratas (Top 2) lolos ke{' '}
+              {tournament.participants.length} pasangan bertanding di {groups.length} pool. Juara &amp; runner-up lolos ke{' '}
               <strong className="text-blue-400">Bagan Atas (Upper Bracket)</strong>, dan 2 peringkat
-              terbawah (Peringkat 3 & 4) lolos ke{' '}
+              3 &amp; 4 lolos ke{' '}
               <strong className="text-emerald-400">Bagan Bawah (Bottom Bracket)</strong>.
             </p>
           </div>
@@ -78,19 +83,21 @@ export default function GroupStageViewer({
                   <button
                     onClick={handleGenerateKnockout}
                     className={`px-5 py-3 rounded-2xl text-white font-black text-xs shadow-lg transition-all flex items-center gap-2 ${
-                      groupMatches.length > 0 && groupMatches.every((m) => m.status === 'FINISHED')
+                      allGroupsComplete
                         ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/30 ring-2 ring-emerald-400 animate-pulse'
                         : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 shadow-blue-500/25'
                     }`}
+                    disabled={!allGroupsComplete}
                   >
                     <Layers className="w-4 h-4" />
                     <span>Kunci Klasemen & Buat 2 Bagan Knockout</span>
                   </button>
-                  {groupMatches.length > 0 && groupMatches.every((m) => m.status === 'FINISHED') && (
+                  {allGroupsComplete && (
                     <p className="text-[11px] text-emerald-400 font-bold">
-                      ✅ Semua 24 match grup selesai! Siap dibuat bagan.
+                      ✅ Semua {groupMatches.length} match grup selesai! Siap dibuat bagan.
                     </p>
                   )}
+                  {!allGroupsComplete && <p className="text-[11px] text-slate-500">Selesaikan semua pertandingan grup sebelum mengunci klasemen.</p>}
                 </div>
               )}
             </div>
@@ -102,20 +109,20 @@ export default function GroupStageViewer({
           <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-1">
               <Users className="w-4 h-4 text-amber-400" />
-              Fase 1: 4 Grup (@ 4 Pasangan)
+              Fase 1: {groups.length} Pool ({tournament.participants.length / groups.length} pasangan/pool)
             </div>
             <p className="text-sm font-black text-white">Round Robin Antar Tim</p>
             <p className="text-[11px] text-slate-400 mt-1">
-              Total 24 pertandingan. Masing-masing tim bermain 3 kali untuk menentukan peringkat grup.
+              Total {groupMatches.length} pertandingan. Setiap pasangan bermain {Math.max(0, tournament.participants.filter((p) => p.group === groups[0]).length - 1)} kali. {tournament.rules.groupScoreMode === 'SET_TALLY' ? 'Admin menginput jumlah set menang; skor game per set tidak ditampilkan.' : 'Peringkat ditentukan dari hasil pertandingan.'}
             </p>
           </div>
 
           <div className="p-4 rounded-2xl bg-blue-950/30 border border-blue-800/40">
             <div className="flex items-center gap-2 text-xs font-bold text-blue-400 mb-1">
               <Trophy className="w-4 h-4 text-blue-400" />
-              🏆 Bagan Atas / Upper (8 Tim)
+              🏆 Bagan Atas / Upper ({Math.ceil(tournament.participants.length / groups.length) * groups.length / 2} Tim)
             </div>
-            <p className="text-sm font-black text-blue-200">Top 2 dari Setiap Grup (1A, 2A, 1B, 2B, 1C, 2C, 1D, 2D)</p>
+            <p className="text-sm font-black text-blue-200">Juara &amp; runner-up dari setiap pool (WD: dua tim mendapat bye)</p>
             <p className="text-[11px] text-blue-300/70 mt-1">
               Mulai dari QF ➔ SF ➔ Final (Memperebutkan Juara 1 Bagan Atas).
             </p>
@@ -124,9 +131,9 @@ export default function GroupStageViewer({
           <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-800/40">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 mb-1">
               <Medal className="w-4 h-4 text-emerald-400" />
-              🏅 Bagan Bawah / Bottom (8 Tim)
+              🏅 Bagan Bawah / Beginner ({Math.ceil(tournament.participants.length / groups.length) * groups.length / 2} Tim)
             </div>
-            <p className="text-sm font-black text-emerald-200">Peringkat 3 & 4 (3A, 4A, 3B, 4B, 3C, 4C, 3D, 4D)</p>
+            <p className="text-sm font-black text-emerald-200">Peringkat 3 &amp; 4 dari setiap pool (WD: dua tim mendapat bye)</p>
             <p className="text-[11px] text-emerald-300/70 mt-1">
               Mulai dari QF ➔ SF ➔ Final (Memperebutkan Juara 1 Bagan Bawah).
             </p>
@@ -151,7 +158,7 @@ export default function GroupStageViewer({
               (m) => m.phase === 'GROUP' && (m.groupName === groupName || m.roundName?.includes(groupName))
             );
 
-            const sortedStandings = calculateGroupStandings(rawParticipants, inGroupMatches);
+            const sortedStandings = calculateGroupStandings(rawParticipants, inGroupMatches, tournament.rules.groupScoreMode);
 
             const colorThemes = [
               { header: 'from-blue-600/30 to-blue-900/20' },
@@ -166,9 +173,9 @@ export default function GroupStageViewer({
                 <div className={`px-5 py-3.5 bg-gradient-to-r ${theme.header} border-b border-slate-800 flex items-center justify-between`}>
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg bg-slate-950/80 border border-slate-700 flex items-center justify-center font-black text-xs text-white">{gIdx + 1}</span>
-                    <h4 className="text-sm font-black text-white uppercase tracking-wider">{groupName}</h4>
+                    <h4 className="text-sm font-black text-white uppercase tracking-wider">{poolLabel(groupName)}</h4>
                   </div>
-                  <span className="text-[11px] font-bold text-slate-400">4 Pasangan (Best of 5)</span>
+                  <span className="text-[11px] font-bold text-slate-400">{rawParticipants.length} Pasangan (Best of 5)</span>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -181,7 +188,7 @@ export default function GroupStageViewer({
                         <th className="py-2.5 px-1.5 text-center w-8 text-emerald-400">W</th>
                         <th className="py-2.5 px-1.5 text-center w-8 text-rose-400">L</th>
                         <th className="py-2.5 px-2 text-center">SET (±)</th>
-                        <th className="py-2.5 px-2 text-center">POIN (±)</th>
+                        {tournament.rules.groupScoreMode !== 'SET_TALLY' && <th className="py-2.5 px-2 text-center">POIN (±)</th>}
                         <th className="py-2.5 px-2.5 text-center text-lime-400 font-extrabold">PTS</th>
                         <th className="py-2.5 px-3 text-right">STATUS</th>
                       </tr>
@@ -206,9 +213,9 @@ export default function GroupStageViewer({
                             <td className="py-3 px-2 text-center text-slate-300 font-score font-bold">
                               {p.groupSetsWon}-{p.groupSetsLost} <span className="text-[10px] text-slate-500">({(p.groupSetDiff ?? 0) > 0 ? `+${p.groupSetDiff}` : p.groupSetDiff})</span>
                             </td>
-                            <td className="py-3 px-2 text-center text-slate-300 font-score font-bold">
+                            {tournament.rules.groupScoreMode !== 'SET_TALLY' && <td className="py-3 px-2 text-center text-slate-300 font-score font-bold">
                               {p.groupPointsWon}-{p.groupPointsLost} <span className="text-[10px] text-slate-500">({(p.groupPointDiff ?? 0) > 0 ? `+${p.groupPointDiff}` : p.groupPointDiff})</span>
-                            </td>
+                            </td>}
                             <td className="py-3 px-2.5 text-center font-black font-score text-lime-400 text-sm">{p.groupPoints}</td>
                             <td className="py-3 px-3 text-right">
                               {isTop2 ? (
@@ -234,9 +241,9 @@ export default function GroupStageViewer({
           <div>
             <h3 className="text-lg font-black text-white flex items-center gap-2">
               <Calendar className="w-5 h-5 text-lime-400" />
-              Jadwal & Hasil Pertandingan Fase Grup (Best of 5 Sets)
+              Jadwal & Hasil Pertandingan Fase Grup (Race to 3 dari maksimal 5 set)
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">Total 24 pertandingan round-robin. Menang 3 set untuk menang match.</p>
+            <p className="text-xs text-slate-400 mt-0.5">Total {groupMatches.length} pertandingan round-robin. Skor grup hanya mencatat jumlah set menang; tie-break berdasar selisih set lalu seed.</p>
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
@@ -252,7 +259,7 @@ export default function GroupStageViewer({
                 onClick={() => setSelectedGroupTab(g)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${selectedGroupTab === g ? 'bg-lime-500 text-slate-950 font-black' : 'bg-slate-900 text-slate-400'}`}
               >
-                {g}
+                {poolLabel(g)}
               </button>
             ))}
           </div>
@@ -261,12 +268,12 @@ export default function GroupStageViewer({
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {tournament.matches
             .filter((m) => m.phase === 'GROUP' && (selectedGroupTab === 'ALL' || m.groupName === selectedGroupTab || m.roundName?.includes(selectedGroupTab)))
-            .sort((a, b) => (a.matchOrder || 0) - (b.matchOrder || 0))
+            .sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || '') || (a.matchOrder || 0) - (b.matchOrder || 0))
             .map((match) => {
               const isFinished = match.status === 'FINISHED' || match.status === 'WALKOVER';
               const isWalkover = match.status === 'WALKOVER';
               const isLive = match.status === 'LIVE';
-              const { setsWon1, setsWon2 } = getMatchSetsSummary(match.scores);
+              const { setsWon1, setsWon2 } = getMatchSetsSummary(match.scores, tournament.rules.groupScoreMode);
               const activeScores = getActiveSets(match.scores);
 
               return (
@@ -285,7 +292,7 @@ export default function GroupStageViewer({
                   {/* Header */}
                   <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 border-b border-slate-800/60 pb-2 mb-3">
                     <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                      {match.groupName || 'Fase Grup'} • #{match.matchOrder}
+                      {match.groupName ? poolLabel(match.groupName) : 'Fase Grup'} • #{match.matchOrder}
                     </span>
                     <div className="flex items-center gap-2 flex-wrap justify-end">
                       <span>{match.court || 'Court 1'}</span>
@@ -332,7 +339,9 @@ export default function GroupStageViewer({
                     >
                       <span className="truncate pr-2">{match.participant1?.name || 'TBD'}</span>
                       <div className="flex items-center gap-1 font-score">
-                        {activeScores.length > 0 ? (
+                        {tournament.rules.groupScoreMode === 'SET_TALLY' ? (
+                          <span className="ml-1.5 px-2 py-0.5 rounded-md bg-slate-950 border border-slate-700 text-lime-400 font-black text-xs">{setsWon1} set</span>
+                        ) : activeScores.length > 0 ? (
                           activeScores.map((s, idx) => (
                             <span
                               key={idx}
@@ -348,7 +357,7 @@ export default function GroupStageViewer({
                         ) : (
                           <span className="text-slate-600 text-xs">-</span>
                         )}
-                        {(isFinished || isLive) && (
+                        {tournament.rules.groupScoreMode !== 'SET_TALLY' && (isFinished || isLive) && (
                           <span className="ml-1.5 px-2 py-0.5 rounded-md bg-slate-950 border border-slate-700 text-lime-400 font-black text-xs">
                             {setsWon1} Set
                           </span>
@@ -366,7 +375,9 @@ export default function GroupStageViewer({
                     >
                       <span className="truncate pr-2">{match.participant2?.name || 'TBD'}</span>
                       <div className="flex items-center gap-1 font-score">
-                        {activeScores.length > 0 ? (
+                        {tournament.rules.groupScoreMode === 'SET_TALLY' ? (
+                          <span className="ml-1.5 px-2 py-0.5 rounded-md bg-slate-950 border border-slate-700 text-lime-400 font-black text-xs">{setsWon2} set</span>
+                        ) : activeScores.length > 0 ? (
                           activeScores.map((s, idx) => (
                             <span
                               key={idx}
@@ -382,7 +393,7 @@ export default function GroupStageViewer({
                         ) : (
                           <span className="text-slate-600 text-xs">-</span>
                         )}
-                        {(isFinished || isLive) && (
+                        {tournament.rules.groupScoreMode !== 'SET_TALLY' && (isFinished || isLive) && (
                           <span className="ml-1.5 px-2 py-0.5 rounded-md bg-slate-950 border border-slate-700 text-lime-400 font-black text-xs">
                             {setsWon2} Set
                           </span>

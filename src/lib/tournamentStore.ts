@@ -222,7 +222,7 @@ export const TournamentService = {
 
   async create(tournament: Tournament): Promise<Tournament> {
     const list = getStoredTournaments();
-    const updated = [tournament, ...list];
+    const updated = [tournament, ...list.filter((item) => item.id !== tournament.id)];
     saveTournaments(updated, false);
     await saveTournamentsToSupabase([tournament]);
     return tournament;
@@ -263,6 +263,7 @@ export const TournamentService = {
       registrations: tournament.registrations ? [...tournament.registrations] : [],
     }));
     const t = list[index];
+    if (t.rules.registrationOpen === false) return false;
     const newReg: import('@/types/tournament').RegistrationRequest = {
       ...payload,
       id: crypto.randomUUID(),
@@ -467,8 +468,11 @@ export const TournamentService = {
       );
       const targetGames = getTargetGamesForMatch(tournament.sport, tournament.rules?.pointsPerSet);
 
+      const isSetTallyMatch = currentMatch.phase === 'GROUP'
+        ? tournament.rules?.groupScoreMode === 'SET_TALLY'
+        : (tournament.rules?.knockoutScoreMode ?? tournament.rules?.groupScoreMode) === 'SET_TALLY';
       const winCheck = calculateMatchWinner(tournament.sport, payload.scores, setsToWin, targetGames);
-      if (winCheck.isMatchOver && winCheck.winnerSide) {
+      if (!isSetTallyMatch && winCheck.isMatchOver && winCheck.winnerSide) {
         const autoWinner =
           winCheck.winnerSide === 1 ? currentMatch.participant1 : currentMatch.participant2;
         if (autoWinner) {
@@ -523,7 +527,7 @@ export const TournamentService = {
     // If tournament is TWO_STAGE and match was in group stage, recalculate group standings
     if (tournament.format?.startsWith('TWO_STAGE') && currentMatch.phase === 'GROUP') {
       const groupMatches = matches.filter((m) => m.phase === 'GROUP');
-      const groups = ['Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'];
+      const groups = [...new Set(tournament.participants.map((p) => p.group).filter((g): g is string => Boolean(g)))];
       const updatedParticipants: Participant[] = [];
 
       groups.forEach((gName) => {
@@ -531,7 +535,7 @@ export const TournamentService = {
         const inGroupMatches = groupMatches.filter(
           (m) => m.groupName === gName || m.roundName?.includes(gName)
         );
-        const ranked = calculateGroupStandings(inGroup, inGroupMatches);
+        const ranked = calculateGroupStandings(inGroup, inGroupMatches, tournament.rules?.groupScoreMode);
         updatedParticipants.push(...ranked);
       });
 
@@ -543,9 +547,13 @@ export const TournamentService = {
 
     // Also update tournament status if all matches finished
     const allFinished = matches.every((m) => m.status === 'FINISHED' || m.status === 'WALKOVER');
-    if (allFinished) {
+    const groupStageAwaitingKnockout = tournament.format?.startsWith('TWO_STAGE') &&
+      !tournament.groupStageCompleted &&
+      matches.some((m) => m.phase === 'GROUP') &&
+      matches.filter((m) => m.phase === 'GROUP').every((m) => m.status === 'FINISHED' || m.status === 'WALKOVER');
+    if (allFinished && !groupStageAwaitingKnockout) {
       tournament.status = 'COMPLETED';
-    } else if (matches.some((m) => m.status === 'LIVE')) {
+    } else if (matches.some((m) => m.status === 'LIVE') || groupStageAwaitingKnockout) {
       tournament.status = 'LIVE';
     }
 
@@ -562,6 +570,8 @@ export const TournamentService = {
 
     const tournament = { ...list[tIndex] };
     if (!tournament.format?.startsWith('TWO_STAGE')) return null;
+    const groupMatches = tournament.matches.filter((m) => m.phase === 'GROUP');
+    if (groupMatches.length === 0 || groupMatches.some((m) => m.status !== 'FINISHED' && m.status !== 'WALKOVER')) return null;
 
     const { upperBracketMatches, bottomBracketMatches } = generateKnockoutStageFromGroups(
       tournament.id,
@@ -569,8 +579,38 @@ export const TournamentService = {
       tournament.courts
     );
 
+    // Generator defaults are not event timings. Preserve only the explicit
+    // Men's Double QF slots from its PDF; leave unspecified rounds editable.
+    if (tournament.id === 'seed_padel_md_v1') {
+      const qfSchedule: Record<string, Array<[string, string]>> = {
+        KNOCKOUT_UPPER: [
+          ['14:40-15:00 WIB', 'Court 1'],
+          ['14:40-15:00 WIB', 'Court 2'],
+          ['15:00-15:20 WIB', 'Court 1'],
+          ['15:00-15:20 WIB', 'Court 2'],
+        ],
+        KNOCKOUT_BOTTOM: [
+          ['14:40-15:00 WIB', 'Court 3'],
+          ['15:00-15:20 WIB', 'Court 3'],
+          ['15:20-15:40 WIB', 'Court 1'],
+          ['15:20-15:40 WIB', 'Court 2'],
+        ],
+      };
+      [...upperBracketMatches, ...bottomBracketMatches].forEach((match) => {
+        if (match.roundName.toLowerCase().includes('perempat')) {
+          const scheduled = qfSchedule[match.phase || '']?.[match.matchOrder - 1];
+          if (scheduled) [match.scheduledTime, match.court] = scheduled;
+        } else {
+          match.scheduledTime = '';
+        }
+      });
+    } else if (tournament.id === 'seed_padel_wd_v1') {
+      [...upperBracketMatches, ...bottomBracketMatches].forEach((match) => {
+        match.scheduledTime = '';
+      });
+    }
+
     // Keep existing group matches and add the two knockout brackets
-    const groupMatches = tournament.matches.filter((m) => m.phase === 'GROUP');
     tournament.matches = [...groupMatches, ...upperBracketMatches, ...bottomBracketMatches];
     tournament.groupStageCompleted = true;
 

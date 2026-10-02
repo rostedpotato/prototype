@@ -76,7 +76,7 @@ export default function TournamentTVDisplayPage() {
   const courtData = courts.map((courtName) => {
     const courtMatches = tournament.matches
       .filter((m) => m.court === courtName)
-      .sort((a, b) => (a.matchOrder || 0) - (b.matchOrder || 0));
+      .sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || '') || (a.matchOrder || 0) - (b.matchOrder || 0));
 
     // Priority 1: LIVE match on this court
     let activeMatch = courtMatches.find((m) => m.status === 'LIVE');
@@ -165,7 +165,11 @@ export default function TournamentTVDisplayPage() {
             const isLive = activeMatch?.status === 'LIVE';
             const isFinished = activeMatch?.status === 'FINISHED';
             const isWalkover = activeMatch?.status === 'WALKOVER';
-            const { setsWon1, setsWon2 } = getMatchSetsSummary(activeMatch?.scores);
+            const scoreMode = activeMatch?.phase === 'GROUP'
+              ? tournament.rules.groupScoreMode
+              : (tournament.rules.knockoutScoreMode ?? tournament.rules.groupScoreMode);
+            const isSetTallyMatch = scoreMode === 'SET_TALLY';
+            const { setsWon1, setsWon2 } = getMatchSetsSummary(activeMatch?.scores, scoreMode);
 
             return (
               <div
@@ -253,22 +257,17 @@ export default function TournamentTVDisplayPage() {
                       <div className="flex items-center gap-2">
                         {/* Per-set breakdown boxes */}
                         <div className="flex items-center gap-1.5">
-                          {activeMatch?.scores.map((s) => (
-                            <div
-                              key={s.setNumber}
-                              className={`w-7 h-9 rounded-lg flex items-center justify-center font-mono text-sm font-bold border ${
-                                activeMatch.currentSet === s.setNumber && isLive
-                                  ? 'bg-lime-500/20 border-lime-500/50 text-lime-300'
-                                  : 'bg-slate-900 border-slate-800 text-slate-300'
-                              }`}
-                            >
+                          {isSetTallyMatch ? (
+                            <div className="w-7 h-9 rounded-lg flex items-center justify-center font-mono text-sm font-bold border bg-slate-900 border-slate-800 text-slate-300">{setsWon1}</div>
+                          ) : activeMatch?.scores.map((s) => (
+                            <div key={s.setNumber} className={`w-7 h-9 rounded-lg flex items-center justify-center font-mono text-sm font-bold border ${activeMatch.currentSet === s.setNumber && isLive ? 'bg-lime-500/20 border-lime-500/50 text-lime-300' : 'bg-slate-900 border-slate-800 text-slate-300'}`}>
                               {s.score1}
                             </div>
                           ))}
                         </div>
 
                         {/* Large Sets Won Indicator */}
-                        <div className="w-11 h-12 rounded-xl bg-lime-500 text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg shadow-lime-500/20 ml-2">
+                        <div className={`w-11 h-12 rounded-xl bg-lime-500 text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg shadow-lime-500/20 ml-2 ${isSetTallyMatch ? 'hidden' : ''}`}>
                           {setsWon1}
                         </div>
                       </div>
@@ -303,22 +302,17 @@ export default function TournamentTVDisplayPage() {
                       <div className="flex items-center gap-2">
                         {/* Per-set breakdown boxes */}
                         <div className="flex items-center gap-1.5">
-                          {activeMatch?.scores.map((s) => (
-                            <div
-                              key={s.setNumber}
-                              className={`w-7 h-9 rounded-lg flex items-center justify-center font-mono text-sm font-bold border ${
-                                activeMatch.currentSet === s.setNumber && isLive
-                                  ? 'bg-lime-500/20 border-lime-500/50 text-lime-300'
-                                  : 'bg-slate-900 border-slate-800 text-slate-300'
-                              }`}
-                            >
+                          {isSetTallyMatch ? (
+                            <div className="w-7 h-9 rounded-lg flex items-center justify-center font-mono text-sm font-bold border bg-slate-900 border-slate-800 text-slate-300">{setsWon2}</div>
+                          ) : activeMatch?.scores.map((s) => (
+                            <div key={s.setNumber} className={`w-7 h-9 rounded-lg flex items-center justify-center font-mono text-sm font-bold border ${activeMatch.currentSet === s.setNumber && isLive ? 'bg-lime-500/20 border-lime-500/50 text-lime-300' : 'bg-slate-900 border-slate-800 text-slate-300'}`}>
                               {s.score2}
                             </div>
                           ))}
                         </div>
 
                         {/* Large Sets Won Indicator */}
-                        <div className="w-11 h-12 rounded-xl bg-lime-500 text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg shadow-lime-500/20 ml-2">
+                        <div className={`w-11 h-12 rounded-xl bg-lime-500 text-slate-950 font-black text-2xl flex items-center justify-center shadow-lg shadow-lime-500/20 ml-2 ${isSetTallyMatch ? 'hidden' : ''}`}>
                           {setsWon2}
                         </div>
                       </div>

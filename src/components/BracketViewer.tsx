@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Tournament, Match } from '@/types/tournament';
 import { useAdminAuth } from '@/lib/authStore';
+import { getMatchSetsSummary } from '@/lib/standingUtils';
 import { Trophy, SlidersHorizontal, Medal, Sparkles, Layers } from 'lucide-react';
 
 interface BracketViewerProps {
@@ -85,11 +86,13 @@ export default function BracketViewer({
   // Group matches by round
   const maxRound = targetMatches.length > 0 ? Math.max(...targetMatches.map((m) => m.round)) : 1;
   const roundsArray = Array.from({ length: maxRound }, (_, i) => i + 1);
+  const useSetTallyScore =
+    (tournament.rules.knockoutScoreMode ?? tournament.rules.groupScoreMode) === 'SET_TALLY';
 
   // Find champion if final is finished
   const finalMatch = targetMatches.find((m) => m.round === maxRound);
   const champion =
-    finalMatch?.status === 'FINISHED' && finalMatch.winnerId
+    (finalMatch?.status === 'FINISHED' || finalMatch?.status === 'WALKOVER') && finalMatch.winnerId
       ? finalMatch.participant1?.id === finalMatch.winnerId
         ? finalMatch.participant1
         : finalMatch.participant2?.id === finalMatch.winnerId
@@ -239,12 +242,19 @@ export default function BracketViewer({
                     {pairs.map((pair, pIdx) => (
                       <div key={pIdx} className="flex flex-col justify-around gap-6 flex-1">
                         {pair.map((match) => {
+                          const matchSetSummary = getMatchSetsSummary(
+                            match.scores,
+                            useSetTallyScore ? 'SET_TALLY' : undefined
+                          );
+                          const displayedScores = useSetTallyScore
+                            ? [{ setNumber: 1, score1: matchSetSummary.setsWon1, score2: matchSetSummary.setsWon2 }]
+                            : match.scores;
                           const isWinner1 =
-                            match.status === 'FINISHED' &&
+                            (match.status === 'FINISHED' || match.status === 'WALKOVER') &&
                             match.winnerId &&
                             match.winnerId === match.participant1?.id;
                           const isWinner2 =
-                            match.status === 'FINISHED' &&
+                            (match.status === 'FINISHED' || match.status === 'WALKOVER') &&
                             match.winnerId &&
                             match.winnerId === match.participant2?.id;
 
@@ -307,23 +317,18 @@ export default function BracketViewer({
                                   }`}
                                 >
                                   <div className="flex items-center gap-1.5 min-w-0 pr-2">
-                                    {match.participant1?.seed && (
-                                      <span className="text-[10px] text-amber-400 font-black px-1 rounded bg-amber-400/10 border border-amber-400/30">
-                                        [{match.participant1.seed}]
-                                      </span>
-                                    )}
                                     <span className="truncate">
-                                      {match.participant1?.name || (
+                                      {match.participant1?.name || (match.status === 'WALKOVER' && match.participant2 ? 'BYE' : (
                                         <span className="text-slate-500 italic font-normal">
                                           Menunggu pemenang...
                                         </span>
-                                      )}
+                                      ))}
                                     </span>
                                   </div>
 
                                   {/* Score Boxes */}
                                   <div className="flex items-center gap-1 font-score text-xs flex-shrink-0">
-                                    {match.scores.map((s, idx) => {
+                                    {displayedScores.map((s, idx) => {
                                       if (
                                         s.score1 === 0 &&
                                         s.score2 === 0 &&
@@ -357,23 +362,18 @@ export default function BracketViewer({
                                   }`}
                                 >
                                   <div className="flex items-center gap-1.5 min-w-0 pr-2">
-                                    {match.participant2?.seed && (
-                                      <span className="text-[10px] text-amber-400 font-black px-1 rounded bg-amber-400/10 border border-amber-400/30">
-                                        [{match.participant2.seed}]
-                                      </span>
-                                    )}
                                     <span className="truncate">
-                                      {match.participant2?.name || (
+                                      {match.participant2?.name || (match.status === 'WALKOVER' && match.participant1 ? 'BYE' : (
                                         <span className="text-slate-500 italic font-normal">
                                           Menunggu pemenang...
                                         </span>
-                                      )}
+                                      ))}
                                     </span>
                                   </div>
 
                                   {/* Score Boxes */}
                                   <div className="flex items-center gap-1 font-score text-xs flex-shrink-0">
-                                    {match.scores.map((s, idx) => {
+                                    {displayedScores.map((s, idx) => {
                                       if (
                                         s.score1 === 0 &&
                                         s.score2 === 0 &&

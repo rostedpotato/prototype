@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { Match, SetScore, MatchStatus, SportType, Participant } from '@/types/tournament';
 import { TournamentService, useTournament } from '@/lib/tournamentStore';
 import { useAdminAuth } from '@/lib/authStore';
+import { getMatchSetsSummary } from '@/lib/standingUtils';
 import {
   checkSetStatus,
   calculateMatchWinner,
+  calculateSetTallyWinner,
   getSetsToWinForRules,
   getMaxSetsForRules,
   getTargetGamesForMatch,
@@ -24,6 +26,8 @@ import {
   Flag,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+
+const BYE_SLOT_ID = '__MANUAL_BYE__';
 
 interface TeamScoreBoxProps {
   participant?: Participant | null;
@@ -116,6 +120,9 @@ export default function AdminScoringModal({
   const { tournament } = useTournament(tournamentId);
   const { isAdmin } = useAdminAuth();
 
+  const isSetTallyMatch = match?.phase === 'GROUP'
+    ? tournament?.rules?.groupScoreMode === 'SET_TALLY'
+    : (tournament?.rules?.knockoutScoreMode ?? tournament?.rules?.groupScoreMode) === 'SET_TALLY';
   const setsToWin = getSetsToWinForRules(tournament?.rules, sport, match?.roundName || '');
   const maxSets = getMaxSetsForRules(tournament?.rules, sport, match?.roundName || '');
   const targetGames = getTargetGamesForMatch(sport, tournament?.rules?.pointsPerSet);
@@ -144,18 +151,27 @@ export default function AdminScoringModal({
         ? match.scores.map((s) => ({ ...s }))
         : Array.from({ length: maxSets }, (_, i) => ({ setNumber: i + 1, score1: 0, score2: 0 }));
 
-    while (loadedScores.length < maxSets) {
-      loadedScores.push({ setNumber: loadedScores.length + 1, score1: 0, score2: 0 });
+    if (isSetTallyMatch) {
+      const tally = getMatchSetsSummary(loadedScores, 'SET_TALLY');
+      setScores([{ setNumber: 1, score1: tally.setsWon1, score2: tally.setsWon2 }]);
+    } else {
+      while (loadedScores.length < maxSets) {
+        loadedScores.push({ setNumber: loadedScores.length + 1, score1: 0, score2: 0 });
+      }
+      setScores(loadedScores);
     }
-    setScores(loadedScores);
     setStatus(match.status);
     setServingSide(match.servingSide || 1);
     setWinnerId(match.winnerId || null);
     setCourt(match.court || 'Court 1');
     setReferee(match.referee || '');
     setScheduledTime(match.scheduledTime || '09:00 WIB');
-    setP1Id(match.participant1?.id || '');
-    setP2Id(match.participant2?.id || '');
+    setP1Id(match.status === 'WALKOVER' && !match.participant1 && match.participant2
+      ? BYE_SLOT_ID
+      : match.participant1?.id || '');
+    setP2Id(match.status === 'WALKOVER' && !match.participant2 && match.participant1
+      ? BYE_SLOT_ID
+      : match.participant2?.id || '');
   }
 
   if (!isOpen || !match || !tournament || !isAdmin) return null;
@@ -165,10 +181,43 @@ export default function AdminScoringModal({
 
   const currentSetScore = scores[activeSet - 1] || { setNumber: activeSet, score1: 0, score2: 0 };
   const currentSetStatus = checkSetStatus(sport, currentSetScore.score1, currentSetScore.score2, targetGames);
-  const matchWinnerStatus = calculateMatchWinner(sport, scores, setsToWin, targetGames);
+  const matchWinnerStatus = isSetTallyMatch
+    ? calculateSetTallyWinner(scores)
+    : calculateMatchWinner(sport, scores, setsToWin, targetGames);
 
-  const p1 = tournament.participants.find((p) => p.id === p1Id) || match.participant1;
-  const p2 = tournament.participants.find((p) => p.id === p2Id) || match.participant2;
+  const p1 = p1Id && p1Id !== BYE_SLOT_ID
+    ? tournament.participants.find((p) => p.id === p1Id) || match.participant1
+    : null;
+  const p2 = p2Id && p2Id !== BYE_SLOT_ID
+    ? tournament.participants.find((p) => p.id === p2Id) || match.participant2
+    : null;
+
+  const resetScores = () =>
+    Array.from({ length: maxSets }, (_, index) => ({ setNumber: index + 1, score1: 0, score2: 0 }));
+
+  const handleParticipantChange = (slot: 1 | 2, value: string) => {
+    const nextP1Id = slot === 1 ? value : p1Id;
+    const nextP2Id = slot === 2 ? value : p2Id;
+    if (slot === 1) setP1Id(value);
+    else setP2Id(value);
+
+    const byeSlot = nextP1Id === BYE_SLOT_ID ? 1 : nextP2Id === BYE_SLOT_ID ? 2 : null;
+    const opponentId = byeSlot === 1 ? nextP2Id : byeSlot === 2 ? nextP1Id : '';
+    const opponent = opponentId
+      ? tournament.participants.find((participant) => participant.id === opponentId) ||
+        (byeSlot === 1 ? match.participant2 : match.participant1)
+      : null;
+
+    setScores(resetScores());
+    if (byeSlot && opponent) {
+      setStatus('WALKOVER');
+      setWinnerId(opponent.id);
+      return;
+    }
+
+    setStatus('UPCOMING');
+    setWinnerId(null);
+  };
 
   const handleScoreChange = (team: 1 | 2, delta: number) => {
     const newScores = scores.map((s) => {
@@ -221,6 +270,16 @@ export default function AdminScoringModal({
     }
   };
 
+  const handleSetTallyChange = (team: 1 | 2, value: number) => {
+    const score1 = team === 1 ? value : (scores[0]?.score1 || 0);
+    const score2 = team === 2 ? value : (scores[0]?.score2 || 0);
+    setScores([{ setNumber: 1, score1, score2 }]);
+    // Skor set bebas mengikuti aturan tiap babak. Admin menentukan pemenang
+    // dan kapan pertandingan dinyatakan selesai melalui kontrol di bawah.
+    setWinnerId(null);
+    setStatus('LIVE');
+  };
+
   const handleDeclareWalkover = (losingSide: 1 | 2) => {
     const winningParticipant = losingSide === 1 ? p2 : p1;
     const losingParticipant = losingSide === 1 ? p1 : p2;
@@ -237,16 +296,18 @@ export default function AdminScoringModal({
       // Populate winning sets for target games so record is clean
       const setsNeeded = setsToWin || 3;
       const target = targetGames || 6;
-      const woScores = scores.map((s, idx) => {
-        if (idx < setsNeeded) {
-          return {
-            ...s,
-            score1: losingSide === 2 ? target : 0,
-            score2: losingSide === 1 ? target : 0,
-          };
-        }
-        return { ...s, score1: 0, score2: 0 };
-      });
+      const woScores = isSetTallyMatch
+        ? [{ setNumber: 1, score1: losingSide === 2 ? setsNeeded : 0, score2: losingSide === 1 ? setsNeeded : 0 }]
+        : scores.map((s, idx) => {
+            if (idx < setsNeeded) {
+              return {
+                ...s,
+                score1: losingSide === 2 ? target : 0,
+                score2: losingSide === 1 ? target : 0,
+              };
+            }
+            return { ...s, score1: 0, score2: 0 };
+          });
       setScores(woScores);
     }
   };
@@ -257,9 +318,15 @@ export default function AdminScoringModal({
   };
 
   const handleSave = () => {
+    if (isSetTallyMatch && status === 'FINISHED') {
+      if (!winnerId) {
+        window.alert('Pilih pemenang pertandingan secara manual sebelum menyimpan hasil selesai.');
+        return;
+      }
+    }
     const isOver = status === 'FINISHED' || status === 'WALKOVER';
     let finalWinnerId = winnerId;
-    if (isOver && !finalWinnerId) {
+    if (isOver && !finalWinnerId && !isSetTallyMatch) {
       if (matchWinnerStatus.winnerSide === 1 && p1) finalWinnerId = p1.id;
       else if (matchWinnerStatus.winnerSide === 2 && p2) finalWinnerId = p2.id;
     }
@@ -333,7 +400,7 @@ export default function AdminScoringModal({
                     {match.roundName}
                   </span>
                   <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                    Target: Menang {setsToWin} Set
+                    {isSetTallyMatch ? 'Hasil set diatur admin' : `Target: Menang ${setsToWin} Set`}
                   </span>
                 </div>
               </div>
@@ -377,17 +444,18 @@ export default function AdminScoringModal({
           </div>
 
           {/* Status Alert Banner if match finished */}
-          {matchWinnerStatus.isMatchOver && (
+          {(isSetTallyMatch ? status === 'FINISHED' : matchWinnerStatus.isMatchOver) && (
             <div className="p-3.5 bg-gradient-to-r from-amber-500/20 to-lime-500/20 border border-amber-400/40 rounded-2xl flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <Trophy className="w-5 h-5 text-amber-400 flex-shrink-0" />
                 <div>
                   <p className="text-xs font-black text-white">
-                    PERTANDINGAN MEMENUHI SYARAT KEMENANGAN ({setsToWin} SET MENANG)
+                    {isSetTallyMatch ? 'SKOR SET SUDAH DIINPUT' : `PERTANDINGAN MEMENUHI SYARAT KEMENANGAN (${setsToWin} SET MENANG)`}
                   </p>
                   <p className="text-xs text-amber-300 font-bold">
-                    Pemenang:{' '}
-                    {matchWinnerStatus.winnerSide === 1 ? p1?.name || 'Peserta 1' : p2?.name || 'Peserta 2'}
+                    {isSetTallyMatch
+                      ? `Pemenang admin: ${winnerId === p1?.id ? p1?.name : p2?.name}`
+                      : `Pemenang: ${matchWinnerStatus.winnerSide === 1 ? p1?.name || 'Peserta 1' : p2?.name || 'Peserta 2'}`}
                   </p>
                 </div>
               </div>
@@ -410,13 +478,14 @@ export default function AdminScoringModal({
                 <span className="text-[10px] text-slate-400 font-semibold block mb-0.5">Slot 1 (Atas)</span>
                 <select
                   value={p1Id}
-                  onChange={(e) => setP1Id(e.target.value)}
+                  onChange={(e) => handleParticipantChange(1, e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-lime-500"
                 >
                   <option value="">-- Menunggu Lawan (TBD) --</option>
+                  <option value={BYE_SLOT_ID}>BYE — tim pada slot lawan maju</option>
                   {tournament.participants.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.seed ? `[#${p.seed}] ` : ''}{p.name}
+                      {p.name}
                     </option>
                   ))}
                 </select>
@@ -426,13 +495,14 @@ export default function AdminScoringModal({
                 <span className="text-[10px] text-slate-400 font-semibold block mb-0.5">Slot 2 (Bawah)</span>
                 <select
                   value={p2Id}
-                  onChange={(e) => setP2Id(e.target.value)}
+                  onChange={(e) => handleParticipantChange(2, e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-lime-500"
                 >
                   <option value="">-- Menunggu Lawan (TBD) --</option>
+                  <option value={BYE_SLOT_ID}>BYE — tim pada slot lawan maju</option>
                   {tournament.participants.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.seed ? `[#${p.seed}] ` : ''}{p.name}
+                      {p.name}
                     </option>
                   ))}
                 </select>
@@ -512,6 +582,41 @@ export default function AdminScoringModal({
             </div>
           </div>
 
+          {isSetTallyMatch ? (
+            <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/5 p-4 space-y-4">
+              <div>
+                <p className="text-sm font-black text-white">Skor fase grup — jumlah set menang</p>
+                <p className="text-xs text-slate-400 mt-1">Masukkan jumlah set yang dimenangkan masing-masing tim sesuai aturan babak ini. Tidak ada batas race-to otomatis; admin memilih pemenang dan status pertandingan.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[p1, p2].map((participant, index) => {
+                  const side = (index + 1) as 1 | 2;
+                  const value = side === 1 ? (scores[0]?.score1 || 0) : (scores[0]?.score2 || 0);
+                  return (
+                    <label key={side} className="rounded-xl border border-slate-700 bg-slate-950/70 p-3">
+                      <span className="block truncate text-xs font-bold text-slate-300">{participant?.name || `Tim ${side}`}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={value}
+                        onChange={(event) => handleSetTallyChange(side, Math.max(0, Math.trunc(Number(event.target.value) || 0)))}
+                        className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-center text-2xl font-black text-white"
+                        aria-label={`Jumlah set menang ${participant?.name || `tim ${side}`}`}
+                      />
+                      <span className="mt-1 block text-center text-[10px] text-slate-500">set menang</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {matchWinnerStatus.isMatchOver && (
+                <p className="rounded-lg bg-emerald-500/10 p-2 text-center text-xs font-bold text-emerald-300">
+                  Skor lebih tinggi: {matchWinnerStatus.winnerSide === 1 ? p1?.name : p2?.name} ({matchWinnerStatus.setsWon1}–{matchWinnerStatus.setsWon2}). Pemenang resmi dipilih admin di bawah.
+                </p>
+              )}
+            </div>
+          ) : (
+          <>
           {/* Set Selector Tabs */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -675,6 +780,8 @@ export default function AdminScoringModal({
               </table>
             </div>
           </div>
+          </>
+          )}
 
           {/* Winner Confirmation Box */}
           <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2">

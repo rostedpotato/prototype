@@ -88,6 +88,9 @@ export interface TournamentRules {
   deuceMargin: number; // 2 points margin
   maxPointCap?: number; // 30 for badminton
   customPadelScoring?: boolean; // Padel best of 5 (Grp/QF: 3, SF: 4, F: 6)
+  groupScoreMode?: 'SET_TALLY'; // Fase grup mencatat jumlah set menang, bukan skor per set
+  knockoutScoreMode?: 'SET_TALLY'; // Babak knockout mencatat jumlah set menang, bukan skor per set
+  registrationOpen?: boolean; // undefined = default open; false = turnamen sudah tertutup
 }
 
 export interface Tournament {

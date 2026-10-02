@@ -7,10 +7,15 @@ import { TournamentService } from '@/lib/tournamentStore';
 import { generateGroupStageMatches, getCategoryLabel } from '@/lib/bracketGenerator';
 import { useAdminAuth } from '@/lib/authStore';
 import type { Match, Participant, SetScore } from '@/types/tournament';
+import {
+  buildPadelTournamentSeed,
+  PADEL_MD_SEED_ID,
+  PADEL_WD_SEED_ID,
+} from '@/lib/seedPadelTournament';
 
 const SEED_ID = 'seed_two_stage_padel_custom';
 
-// Halaman ini hanya untuk pengujian lokal — jangan pernah aktif di production.
+// Data fixture tetap tersembunyi di production; data turnamen resmi bisa di-inject admin.
 const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
 
 function isoDate(offsetDays = 0) {
@@ -142,7 +147,7 @@ function buildSeedTournament() {
 export default function SeedPage() {
   const router = useRouter();
   const { isAdmin, isReady } = useAdminAuth();
-  const [isWorking, setIsWorking] = useState<'inject' | 'delete' | null>(null);
+  const [isWorking, setIsWorking] = useState<'inject' | 'delete' | 'padel' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -157,11 +162,6 @@ export default function SeedPage() {
     setIsWorking('inject');
     setNotice(null);
     try {
-      // Hapus seed lama (bila ada) supaya re-inject selalu bersih
-      if (TournamentService.getById(SEED_ID)) {
-        TournamentService.delete(SEED_ID);
-      }
-
       const { tournament } = seedTournament();
       await TournamentService.create(tournament);
       router.push(`/admin/tournament/${SEED_ID}`);
@@ -185,6 +185,22 @@ export default function SeedPage() {
     }
   };
 
+  const handleInjectPadel = async () => {
+    const hasExisting = TournamentService.getById(PADEL_MD_SEED_ID) || TournamentService.getById(PADEL_WD_SEED_ID);
+    if (hasExisting && !confirm('Salah satu turnamen padel template sudah ada. Meng-inject ulang akan mengganti kedua turnamen template ini beserta jadwal dan skornya. Lanjutkan?')) return;
+    setIsWorking('padel');
+    setNotice(null);
+    try {
+      const { mensDouble, womensDouble } = buildPadelTournamentSeed();
+      await TournamentService.create(mensDouble);
+      await TournamentService.create(womensDouble);
+      router.push(`/admin/tournament/${PADEL_MD_SEED_ID}`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Gagal meng-inject turnamen padel.');
+      setIsWorking(null);
+    }
+  };
+
   if (!isReady || !isAdmin) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
@@ -193,22 +209,9 @@ export default function SeedPage() {
     );
   }
 
-  if (!IS_DEVELOPMENT) {
-    return (
-      <div className="max-w-2xl mx-auto pb-20">
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-8 text-center space-y-3">
-          <Database className="w-10 h-10 text-slate-600 mx-auto" />
-          <h1 className="text-lg font-black text-white">Halaman Seed Nonaktif</h1>
-          <p className="text-sm text-slate-400">
-            Halaman ini hanya tersedia di environment development.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
+      {IS_DEVELOPMENT && (
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
         <div className="space-y-1 border-b border-slate-800 pb-5">
           <h1 className="text-2xl font-black text-white flex items-center gap-2">
@@ -274,6 +277,38 @@ export default function SeedPage() {
             Data uji sudah ada di perangkat ini — meng-inject ulang akan menggantinya dengan yang baru.
           </p>
         )}
+      </div>
+      )}
+
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5">
+        <div className="space-y-1">
+          <h2 className="text-lg font-black text-white">Inject Turnamen Padel (Data Nyata)</h2>
+          <p className="text-xs text-slate-400 font-medium">
+            Men&apos;s Double (16 pasangan, 4 pool) &amp; Women&apos;s Double (12 pasangan, 3 pool) —
+            Sabtu 3 Oktober 2026, WIN PADEL SUVARNA SUTERA. Semua grup, lapangan, dan jadwal sesuai dokumen resmi.
+          </p>
+        </div>
+
+        <ul className="space-y-2 text-xs text-slate-300 font-medium">
+          <li>• <b className="text-slate-200">Men&apos;s Double</b>: 16 pasangan, Grup 1-4 (Pool A-D), 24 match grup terjadwal 12:20-14:30 WIB.</li>
+          <li>• <b className="text-slate-200">Women&apos;s Double</b>: 12 pasangan, Grup 1-3, 18 match grup terjadwal 09:00-10:30 WIB.</li>
+          <li>• Skor grup hanya menginput jumlah set menang race-to-3 (contoh 3–2), tanpa memasukkan skor game per set.</li>
+          <li>• Status awal UPCOMING. Setelah semua laga grup selesai, kunci klasemen untuk membentuk upper &amp; beginner knockout.</li>
+          <li>• Meng-inject ulang akan memperbarui dua turnamen dengan ID template yang sama; data turnamen lain tidak disentuh.</li>
+        </ul>
+
+        <button
+          onClick={() => void handleInjectPadel()}
+          disabled={isWorking !== null}
+          className="w-full rounded-xl bg-lime-500 px-4 py-3.5 text-sm font-black text-slate-950 hover:bg-lime-400 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+        >
+          {isWorking === 'padel' ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Plus className="w-4 h-4 stroke-[3]" />
+          )}
+          {isWorking === 'padel' ? 'Meng-inject...' : 'Inject Turnamen Padel (MD & WD)'}
+        </button>
       </div>
     </div>
   );

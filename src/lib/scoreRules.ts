@@ -167,6 +167,22 @@ export function calculateMatchWinner(
   return { winnerSide, setsWon1, setsWon2, pointsWon1, pointsWon2, isMatchOver };
 }
 
+export function calculateSetTallyWinner(
+  scores: SetScore[]
+): ReturnType<typeof calculateMatchWinner> {
+  const score1 = scores[0]?.score1 ?? 0;
+  const score2 = scores[0]?.score2 ?? 0;
+  const isMatchOver = (score1 > 0 || score2 > 0) && score1 !== score2;
+  return {
+    winnerSide: score1 > score2 ? 1 : score2 > score1 ? 2 : null,
+    setsWon1: score1,
+    setsWon2: score2,
+    pointsWon1: 0,
+    pointsWon2: 0,
+    isMatchOver,
+  };
+}
+
 export function getSetsToWinForRound(
   sport: SportType,
   customPadelScoring: boolean | undefined,

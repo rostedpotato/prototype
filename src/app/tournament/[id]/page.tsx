@@ -147,12 +147,12 @@ export default function TournamentDetailPage() {
               <span>📺 Layar TV / Big Screen Venue</span>
             </Link>
 
-            <Link
+            {tournament.rules.registrationOpen !== false && <Link
               href="/register"
               className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-xl text-sm font-bold transition-colors shadow-lg shadow-emerald-500/20"
             >
               Daftar Turnamen
-            </Link>
+            </Link>}
           </div>
         </div>
       </div>

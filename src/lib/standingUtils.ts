@@ -16,7 +16,29 @@ export interface ParticipantStanding extends Participant {
 /**
  * Calculates match and set tallies for a match's scores
  */
-export function getMatchSetsSummary(scores: SetScore[] = []) {
+export function getMatchSetsSummary(scores: SetScore[] = [], scoreMode?: 'SET_TALLY') {
+  if (scoreMode === 'SET_TALLY') {
+    // Legacy knockout results stored one game score per row. Convert those rows
+    // to a set tally while keeping the current one-row tally format intact.
+    if (scores.length > 1) {
+      return scores.reduce(
+        (summary, score) => {
+          if (score.score1 > score.score2) summary.setsWon1 += 1;
+          else if (score.score2 > score.score1) summary.setsWon2 += 1;
+          return summary;
+        },
+        { setsWon1: 0, setsWon2: 0, pointsWon1: 0, pointsWon2: 0 }
+      );
+    }
+
+    const tally = scores[0];
+    return {
+      setsWon1: tally?.score1 || 0,
+      setsWon2: tally?.score2 || 0,
+      pointsWon1: 0,
+      pointsWon2: 0,
+    };
+  }
   let setsWon1 = 0;
   let setsWon2 = 0;
   let pointsWon1 = 0;
@@ -46,7 +68,8 @@ export function getActiveSets(scores: SetScore[] = []): SetScore[] {
  */
 export function calculateGroupStandings(
   participants: Participant[],
-  groupMatches: Match[]
+  groupMatches: Match[],
+  scoreMode?: 'SET_TALLY'
 ): ParticipantStanding[] {
   const standings: ParticipantStanding[] = participants.map((p) => {
     const finishedMatches = groupMatches.filter(
@@ -75,10 +98,15 @@ export function calculateGroupStandings(
         const oppScore = isP1 ? s.score2 : s.score1;
 
         if (myScore > 0 || oppScore > 0) {
-          pointsWon += myScore;
-          pointsLost += oppScore;
-          if (myScore > oppScore) setsWon += 1;
-          else if (oppScore > myScore) setsLost += 1;
+          if (scoreMode === 'SET_TALLY') {
+            setsWon += myScore;
+            setsLost += oppScore;
+          } else {
+            pointsWon += myScore;
+            pointsLost += oppScore;
+            if (myScore > oppScore) setsWon += 1;
+            else if (oppScore > myScore) setsLost += 1;
+          }
         }
       });
     });

@@ -423,7 +423,7 @@ export function generateKnockoutStageFromGroups(
   courts: string[] = ['Court 1', 'Court 2']
 ): { upperBracketMatches: Match[]; bottomBracketMatches: Match[] } {
   // Sort each group by points, set difference, point difference, then seed
-  const groups = ['Grup 1', 'Grup 2', 'Grup 3', 'Grup 4'];
+  const groups = [...new Set(groupedParticipants.map((p) => p.group).filter((g): g is string => Boolean(g)))];
   const rankedGroups: Record<string, Participant[]> = {};
   
   groups.forEach((groupName) => {
@@ -449,6 +449,26 @@ export function generateKnockoutStageFromGroups(
   // Standard seeding: 1A vs 2B, 1C vs 2D, 1B vs 2A, 1D vs 2C (for upper)
   const seedUpperBracket = () => {
     const seeded: (Participant | null)[] = new Array(8).fill(null);
+    if (groups.length === 3) {
+      const compareResults = (a: Participant, b: Participant) =>
+        (b.groupPoints || 0) - (a.groupPoints || 0) ||
+        (b.groupSetDiff || 0) - (a.groupSetDiff || 0) ||
+        (a.seed || 999) - (b.seed || 999);
+      const champions = groups.map((group) => rankedGroups[group]?.[0]).filter((p): p is Participant => Boolean(p)).sort(compareResults);
+      const runnersUp = groups.map((group) => rankedGroups[group]?.[1]).filter((p): p is Participant => Boolean(p)).sort(compareResults);
+      const remainingChampion = champions[2];
+      const opponent = runnersUp.find((p) => p.group !== remainingChampion?.group);
+      const otherRunners = runnersUp.filter((p) => p !== opponent);
+
+      // The two best pool winners receive the PDF's two bye slots.
+      seeded[0] = champions[0] ?? null;
+      seeded[2] = remainingChampion ?? null;
+      seeded[3] = opponent ?? null;
+      seeded[4] = otherRunners[0] ?? null;
+      seeded[5] = otherRunners[1] ?? null;
+      seeded[6] = champions[1] ?? null;
+      return seeded;
+    }
     
     // Place group winners and runners-up in specific positions
     // Position mapping to avoid same-group matchups in QF
@@ -466,6 +486,26 @@ export function generateKnockoutStageFromGroups(
 
   const seedBottomBracket = () => {
     const seeded: (Participant | null)[] = new Array(8).fill(null);
+    if (groups.length === 3) {
+      const compareResults = (a: Participant, b: Participant) =>
+        (b.groupPoints || 0) - (a.groupPoints || 0) ||
+        (b.groupSetDiff || 0) - (a.groupSetDiff || 0) ||
+        (a.seed || 999) - (b.seed || 999);
+      const thirdPlaceTeams = groups.map((group) => rankedGroups[group]?.[2]).filter((p): p is Participant => Boolean(p)).sort(compareResults);
+      const fourthPlaceTeams = groups.map((group) => rankedGroups[group]?.[3]).filter((p): p is Participant => Boolean(p)).sort(compareResults);
+      const remainingTeam = thirdPlaceTeams[2];
+      const opponent = fourthPlaceTeams.find((p) => p.group !== remainingTeam?.group);
+      const otherTeams = fourthPlaceTeams.filter((p) => p !== opponent);
+
+      // The two best third-place finishers receive the two bye slots.
+      seeded[0] = thirdPlaceTeams[0] ?? null;
+      seeded[2] = remainingTeam ?? null;
+      seeded[3] = opponent ?? null;
+      seeded[4] = otherTeams[0] ?? null;
+      seeded[5] = otherTeams[1] ?? null;
+      seeded[6] = thirdPlaceTeams[1] ?? null;
+      return seeded;
+    }
     
     // Similar logic for bottom bracket
     seeded[0] = rankedGroups['Grup 1']?.[2] ?? null; // 3A
@@ -503,8 +543,8 @@ export function generateKnockoutStageFromGroups(
         court: courts[courtIndex] || `Court 1`,
         scheduledTime: '14:00 WIB',
         referee: `Wasit ${courtIndex + 1}`,
-        status: 'UPCOMING',
-        winnerId: null,
+        status: p1 && !p2 || p2 && !p1 ? 'WALKOVER' : 'UPCOMING',
+        winnerId: p1 && !p2 ? p1.id : p2 && !p1 ? p2.id : null,
         nextMatchId: null,
         nextMatchSlot: undefined,
         phase: phase,
@@ -583,6 +623,15 @@ export function generateKnockoutStageFromGroups(
   upperQF[2].nextMatchSlot = 1;
   upperQF[3].nextMatchId = upperSF[1].id;
   upperQF[3].nextMatchSlot = 2;
+  upperQF.forEach((match) => {
+    if (match.status === 'WALKOVER' && match.winnerId && match.nextMatchId && match.nextMatchSlot) {
+      const next = upperSF.find((candidate) => candidate.id === match.nextMatchId);
+      if (next) {
+        if (match.nextMatchSlot === 1) next.participant1 = match.participant1 || match.participant2;
+        else next.participant2 = match.participant1 || match.participant2;
+      }
+    }
+  });
   
   upperSF[0].nextMatchId = upperFinal.id;
   upperSF[0].nextMatchSlot = 1;
@@ -603,6 +652,15 @@ export function generateKnockoutStageFromGroups(
   bottomQF[2].nextMatchSlot = 1;
   bottomQF[3].nextMatchId = bottomSF[1].id;
   bottomQF[3].nextMatchSlot = 2;
+  bottomQF.forEach((match) => {
+    if (match.status === 'WALKOVER' && match.winnerId && match.nextMatchId && match.nextMatchSlot) {
+      const next = bottomSF.find((candidate) => candidate.id === match.nextMatchId);
+      if (next) {
+        if (match.nextMatchSlot === 1) next.participant1 = match.participant1 || match.participant2;
+        else next.participant2 = match.participant1 || match.participant2;
+      }
+    }
+  });
   
   bottomSF[0].nextMatchId = bottomFinal.id;
   bottomSF[0].nextMatchSlot = 1;

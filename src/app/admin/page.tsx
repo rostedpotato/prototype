@@ -226,6 +226,13 @@ export default function AdminDashboardPage() {
             <span>Template</span>
           </Link>
           <Link
+            href="/admin/seed"
+            className="px-4 py-2.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-200 text-xs font-bold transition-all flex items-center gap-2"
+          >
+            <Database className="w-4 h-4" />
+            <span>Inject Event PDF</span>
+          </Link>
+          <Link
             href="/admin/tournament/new"
             className="px-4 py-2.5 rounded-xl bg-lime-500 hover:bg-lime-400 text-slate-950 text-xs font-black shadow-lg shadow-lime-500/20 transition-all flex items-center gap-2"
           >

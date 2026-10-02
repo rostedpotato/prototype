@@ -38,6 +38,7 @@ export default function HomePage() {
     sport: SportType;
     match: Match;
     tournamentName: string;
+    scoreMode?: 'SET_TALLY';
   }[] = [];
 
   tournaments.forEach((t) => {
@@ -49,6 +50,9 @@ export default function HomePage() {
           sport: t.sport,
           match: m,
           tournamentName: t.name,
+          scoreMode: m.phase === 'GROUP'
+            ? t.rules.groupScoreMode
+            : (t.rules.knockoutScoreMode ?? t.rules.groupScoreMode),
         });
       });
   });
@@ -116,6 +120,7 @@ export default function HomePage() {
                 key={item.match.id}
                 match={item.match}
                 sport={item.sport}
+                scoreMode={item.match.phase === 'GROUP' ? item.scoreMode : undefined}
                 tournamentName={item.tournamentName}
                 tournamentId={item.tournamentId}
                 onOpenScoreControl={(m) =>

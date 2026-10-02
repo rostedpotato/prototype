@@ -135,6 +135,9 @@ export default function MatchList({ tournament, onOpenScoreControl }: MatchListP
               key={match.id}
               match={match}
               sport={tournament.sport}
+              scoreMode={match.phase === 'GROUP'
+                ? tournament.rules.groupScoreMode
+                : (tournament.rules.knockoutScoreMode ?? tournament.rules.groupScoreMode)}
               tournamentName={tournament.name}
               tournamentId={tournament.id}
               onOpenScoreControl={onOpenScoreControl}

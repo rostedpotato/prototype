@@ -10,19 +10,21 @@ interface LiveScoreCardProps {
   sport: SportType;
   tournamentName?: string;
   tournamentId: string;
+  scoreMode?: 'SET_TALLY';
   onOpenScoreControl?: (match: Match) => void;
 }
 
 export default function LiveScoreCard({
   match,
   sport,
+  scoreMode,
   onOpenScoreControl,
 }: LiveScoreCardProps) {
   const { isAdmin } = useAdminAuth();
 
   const isLive = match.status === 'LIVE';
   const isFinished = match.status === 'FINISHED' || match.status === 'WALKOVER';
-  const { setsWon1, setsWon2 } = getMatchSetsSummary(match.scores);
+  const { setsWon1, setsWon2 } = getMatchSetsSummary(match.scores, scoreMode);
 
   const isWinner1 = match.winnerId && match.winnerId === match.participant1?.id;
   const isWinner2 = match.winnerId && match.winnerId === match.participant2?.id;
@@ -69,7 +71,7 @@ export default function LiveScoreCard({
           {isLive && (
             <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 font-extrabold text-[11px]">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-live-dot" />
-              LIVE SET {match.currentSet}
+              {scoreMode === 'SET_TALLY' ? 'LIVE GROUP' : `LIVE SET ${match.currentSet}`}
             </span>
           )}
           {match.status === 'WALKOVER' && (
@@ -111,13 +113,8 @@ export default function LiveScoreCard({
                     isWinner1 ? 'text-lime-300' : 'text-slate-100'
                   }`}
                 >
-                  {match.participant1?.name || 'TBD (Menunggu Lawan)'}
+                  {match.participant1?.name || (match.status === 'WALKOVER' && match.participant2 ? 'BYE' : 'TBD (Menunggu Lawan)')}
                 </span>
-                {match.participant1?.seed && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 border border-amber-400/30">
-                    [{match.participant1.seed}]
-                  </span>
-                )}
               </div>
               {match.participant1?.club && (
                 <p className="text-[11px] text-slate-400 truncate">
@@ -129,7 +126,7 @@ export default function LiveScoreCard({
 
           {/* Scores Matrix for Participant 1 */}
           <div className="flex items-center gap-1.5 flex-shrink-0 font-score">
-            {match.scores.map((set, idx) => {
+            {(scoreMode === 'SET_TALLY' ? [{ setNumber: 1, score1: setsWon1, score2: setsWon2 }] : match.scores).map((set, idx) => {
               const isCurrentActiveSet = isLive && match.currentSet === set.setNumber;
               const hasScore = set.score1 > 0 || set.score2 > 0 || isCurrentActiveSet;
               if (!hasScore && idx > 0 && !isLive) return null;
@@ -150,7 +147,7 @@ export default function LiveScoreCard({
               );
             })}
             {/* Sets summary tally */}
-            {(isLive || isFinished || setsWon1 > 0 || setsWon2 > 0) && (
+            {scoreMode !== 'SET_TALLY' && (isLive || isFinished || setsWon1 > 0 || setsWon2 > 0) && (
               <div className="w-8 h-8 rounded-lg bg-lime-500/20 text-lime-300 border border-lime-500/40 flex items-center justify-center text-xs font-black ml-1">
                 {setsWon1}
               </div>
@@ -174,13 +171,8 @@ export default function LiveScoreCard({
                     isWinner2 ? 'text-lime-300' : 'text-slate-100'
                   }`}
                 >
-                  {match.participant2?.name || 'TBD (Menunggu Lawan)'}
+                  {match.participant2?.name || (match.status === 'WALKOVER' && match.participant1 ? 'BYE' : 'TBD (Menunggu Lawan)')}
                 </span>
-                {match.participant2?.seed && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 border border-amber-400/30">
-                    [{match.participant2.seed}]
-                  </span>
-                )}
               </div>
               {match.participant2?.club && (
                 <p className="text-[11px] text-slate-400 truncate">
@@ -192,7 +184,7 @@ export default function LiveScoreCard({
 
           {/* Scores Matrix for Participant 2 */}
           <div className="flex items-center gap-1.5 flex-shrink-0 font-score">
-            {match.scores.map((set, idx) => {
+            {(scoreMode === 'SET_TALLY' ? [{ setNumber: 1, score1: setsWon1, score2: setsWon2 }] : match.scores).map((set, idx) => {
               const isCurrentActiveSet = isLive && match.currentSet === set.setNumber;
               const hasScore = set.score1 > 0 || set.score2 > 0 || isCurrentActiveSet;
               if (!hasScore && idx > 0 && !isLive) return null;
@@ -213,7 +205,7 @@ export default function LiveScoreCard({
               );
             })}
             {/* Sets summary tally */}
-            {(isLive || isFinished || setsWon1 > 0 || setsWon2 > 0) && (
+            {scoreMode !== 'SET_TALLY' && (isLive || isFinished || setsWon1 > 0 || setsWon2 > 0) && (
               <div className="w-8 h-8 rounded-lg bg-lime-500/20 text-lime-300 border border-lime-500/40 flex items-center justify-center text-xs font-black ml-1">
                 {setsWon2}
               </div>

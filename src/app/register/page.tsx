@@ -25,7 +25,7 @@ export default function GlobalRegisterPage() {
 
   // Filter only upcoming tournaments or active padel tournaments
   const availableTournaments = useMemo(() => {
-    return tournaments.filter(t => t.status !== 'COMPLETED');
+    return tournaments.filter(t => t.status !== 'COMPLETED' && t.rules.registrationOpen !== false);
   }, [tournaments]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -72,6 +72,10 @@ export default function GlobalRegisterPage() {
       if (!selectedTournament) {
          setError('Turnamen tidak valid.');
          return;
+      }
+      if (selectedTournament.rules.registrationOpen === false) {
+        setError('Pendaftaran untuk turnamen ini sudah ditutup.');
+        return;
       }
 
       // Check for unique team name

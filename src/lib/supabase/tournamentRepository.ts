@@ -11,13 +11,31 @@ import { createClient } from '@/lib/supabase/client';
 
 type DatabaseRow = Record<string, unknown>;
 
-const supabase = createClient();
-const realtimeListeners = new Set<() => void>();
-const realtimeStatusListeners = new Set<(status: RealtimeConnectionStatus) => void>();
-let realtimeChannel: RealtimeChannel | null = null;
-let realtimeStatus: RealtimeConnectionStatus = 'DISCONNECTED';
-
 export type RealtimeConnectionStatus = 'CONNECTING' | 'CONNECTED' | 'ERROR' | 'DISCONNECTED';
+
+interface RealtimeRuntimeState {
+  listeners: Set<() => void>;
+  statusListeners: Set<(status: RealtimeConnectionStatus) => void>;
+  channel: RealtimeChannel | null;
+  status: RealtimeConnectionStatus;
+  notifyTimer: ReturnType<typeof setTimeout> | null;
+}
+
+// Keep the subscription registry stable across Next.js Fast Refresh. The Supabase
+// browser client also survives refresh, so module-local state could otherwise
+// lose its channel reference and try adding callbacks to an already-subscribed channel.
+const realtimeGlobal = globalThis as typeof globalThis & {
+  __racketArenaRealtimeState?: RealtimeRuntimeState;
+};
+const realtimeState = (realtimeGlobal.__racketArenaRealtimeState ??= {
+  listeners: new Set<() => void>(),
+  statusListeners: new Set<(status: RealtimeConnectionStatus) => void>(),
+  channel: null,
+  status: 'DISCONNECTED',
+  notifyTimer: null,
+});
+
+const supabase = createClient();
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -39,8 +57,8 @@ function repositoryError(context: string, error: unknown): Error {
 }
 
 function setRealtimeStatus(status: RealtimeConnectionStatus) {
-  realtimeStatus = status;
-  realtimeStatusListeners.forEach((listener) => listener(status));
+  realtimeState.status = status;
+  realtimeState.statusListeners.forEach((listener) => listener(status));
 }
 
 function asString(value: unknown, fallback = ''): string {
@@ -180,6 +198,11 @@ function tournamentFromRows(
       deuceMargin: asNumber(rules.deuceMargin, 2),
       maxPointCap: typeof rules.maxPointCap === 'number' ? rules.maxPointCap : undefined,
       customPadelScoring: asBoolean(rules.customPadelScoring),
+      groupScoreMode: rules.groupScoreMode === 'SET_TALLY' ? 'SET_TALLY' : undefined,
+      knockoutScoreMode: rules.knockoutScoreMode === 'SET_TALLY' || rules.groupScoreMode === 'SET_TALLY'
+        ? 'SET_TALLY'
+        : undefined,
+      registrationOpen: typeof rules.registrationOpen === 'boolean' ? rules.registrationOpen : undefined,
     },
     format: asString(row.format) as Tournament['format'],
     groupStageCompleted: asBoolean(row.group_stage_completed),
@@ -606,22 +629,45 @@ export async function deleteTournamentFromSupabase(tournamentId: string): Promis
 // Satu kali simpan memicu event di beberapa tabel; debounce agar pembaruan
 // data cukup dijalankan satu kali, bukan sekali per tabel.
 const REALTIME_DEBOUNCE_MS = 600;
-let realtimeNotifyTimer: ReturnType<typeof setTimeout> | null = null;
+const REALTIME_CHANNEL_TOPIC = 'racket-arena-tournament-data';
 
 function notifyListenersDebounced() {
-  if (realtimeNotifyTimer) clearTimeout(realtimeNotifyTimer);
-  realtimeNotifyTimer = setTimeout(() => {
-    realtimeNotifyTimer = null;
-    realtimeListeners.forEach((listener) => listener());
+  if (realtimeState.notifyTimer) clearTimeout(realtimeState.notifyTimer);
+  realtimeState.notifyTimer = setTimeout(() => {
+    realtimeState.notifyTimer = null;
+    realtimeState.listeners.forEach((listener) => listener());
   }, REALTIME_DEBOUNCE_MS);
 }
 
 function ensureRealtimeChannel() {
-  if (realtimeChannel) return;
+  if (realtimeState.channel) return;
+
+  // Recover once if Fast Refresh replaced this module while the Supabase client
+  // kept the previous module's already-joined channel alive.
+  const staleChannel = supabase
+    .getChannels()
+    .find((channel) => channel.topic === `realtime:${REALTIME_CHANNEL_TOPIC}`);
+  if (staleChannel) {
+    realtimeState.channel = staleChannel;
+    setRealtimeStatus('CONNECTING');
+    void supabase.removeChannel(staleChannel).then(
+      () => {
+        if (realtimeState.channel !== staleChannel) return;
+        realtimeState.channel = null;
+        if (realtimeState.listeners.size > 0) ensureRealtimeChannel();
+        else setRealtimeStatus('DISCONNECTED');
+      },
+      (error: unknown) => {
+        console.error('Gagal membersihkan channel Supabase lama:', errorMessage(error));
+        if (realtimeState.channel === staleChannel) setRealtimeStatus('ERROR');
+      }
+    );
+    return;
+  }
 
   setRealtimeStatus('CONNECTING');
-  realtimeChannel = supabase
-    .channel('racket-arena-tournament-data')
+  realtimeState.channel = supabase
+    .channel(REALTIME_CHANNEL_TOPIC)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'tournaments' },
@@ -660,31 +706,28 @@ function ensureRealtimeChannel() {
 }
 
 export function subscribeToTournamentChanges(listener: () => void): () => void {
-  realtimeListeners.add(listener);
+  realtimeState.listeners.add(listener);
   ensureRealtimeChannel();
 
   return () => {
-    realtimeListeners.delete(listener);
-    if (realtimeListeners.size === 0 && realtimeChannel) {
-      const channel = realtimeChannel;
-      realtimeChannel = null;
-      setRealtimeStatus('DISCONNECTED');
-      void supabase.removeChannel(channel);
-    }
+    // Keep the single channel alive for the lifetime of this browser tab. React
+    // Strict Mode and Fast Refresh can immediately remount subscribers; removing
+    // it here races Supabase's async channel teardown and reuses a joined topic.
+    realtimeState.listeners.delete(listener);
   };
 }
 
 export function subscribeToRealtimeStatus(
   listener: (status: RealtimeConnectionStatus) => void
 ): () => void {
-  realtimeStatusListeners.add(listener);
-  listener(realtimeStatus);
+  realtimeState.statusListeners.add(listener);
+  listener(realtimeState.status);
 
   return () => {
-    realtimeStatusListeners.delete(listener);
+    realtimeState.statusListeners.delete(listener);
   };
 }
 
 export function getRealtimeStatus(): RealtimeConnectionStatus {
-  return realtimeStatus;
+  return realtimeState.status;
 }
